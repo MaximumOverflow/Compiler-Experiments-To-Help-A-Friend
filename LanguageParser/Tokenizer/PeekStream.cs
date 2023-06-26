@@ -1,10 +1,10 @@
-﻿namespace LanguageParser.Tokens;
+﻿namespace LanguageParser.Tokenizer;
 
 public struct PeekStream
 {
 	public int Position;
-	private readonly string _text;
 	public int Length => _text.Length;
+	private readonly string _text;
 
 	public PeekStream() : this(string.Empty)
 	{
@@ -56,6 +56,34 @@ public struct PeekStream
 		for (var i = 0; i < span.Length; i++)
 		{
 			if(condition(span[i])) continue;
+			return _text.AsMemory(Position, i);
+		}
+
+		return _text.AsMemory();
+	}
+
+	public delegate bool PeekDelegate<T>(ref T context, char ch);
+	
+	public ReadOnlyMemory<char> Peek<T>(ref T context, PeekDelegate<T> condition)
+	{
+		var span = _text.AsSpan(Position);
+		for (var i = 0; i < span.Length; i++)
+		{
+			if(condition(ref context, span[i])) continue;
+			return _text.AsMemory(Position, i);
+		}
+
+		return _text.AsMemory();
+	}
+	
+	public ReadOnlyMemory<char> Peek(Func<char, char?, bool> condition)
+	{
+		var span = _text.AsSpan(Position);
+		for (var i = 0; i < span.Length; i++)
+		{
+			var ch = span[i];
+			char? next = i + 1 != span.Length ? span[i + 1] : null;
+			if(condition(ch, next)) continue;
 			return _text.AsMemory(Position, i);
 		}
 

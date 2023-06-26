@@ -1,6 +1,6 @@
 ﻿using System.Text.RegularExpressions;
 
-namespace LanguageParser.Tokens;
+namespace LanguageParser.Tokenizer;
 
 public static class Tokenizer
 {
@@ -16,7 +16,7 @@ public static class Tokenizer
 				case '\n' or '\r' or '\t' or ' ': 
 					break;
 				
-				// Skip comments
+				// Skip line comments
 				case '/' when stream.Next is '/':
 				{
 					while (stream.MoveNext(out ch))
@@ -28,7 +28,44 @@ public static class Tokenizer
 					break;
 				}
 				
-				//Parse keywords or names
+				// Skip block comments
+				case '/' when stream.Next is '*':
+				{
+					while (stream.MoveNext(out ch))
+					{
+						if (ch != '*') continue;
+						if (!stream.MoveNext(out ch)) break;
+						if (ch != '/') continue;
+						break;
+					}
+					
+					break;
+				}
+
+				// Parse strings
+				case '"':
+				{
+					var last = '"';
+					stream.MoveNext();
+					var stringText = stream.Peek(ref last, (ref char l, char c) =>
+					{
+						if (c != '"') return true;
+						if (l != '\\') return false;
+						l = c;
+						return true;
+					});
+					
+					tokens.Add(new Token
+					{
+						Text = stringText,
+						Type = TokenType.String,
+					});
+
+					stream.Position += stringText.Length;
+					break;
+				}
+				
+				// Parse keywords or names
 				case '_':
 				case >= 'a' and <= 'z':
 				case >= 'A' and <= 'Z':
@@ -39,25 +76,30 @@ public static class Tokenizer
 						Text = keyword,
 						Type = keyword.Span switch
 						{
-							"if" => TokenType.If,
+							"whether" => TokenType.If,
+							"within" => TokenType.In,
+							"whilst" => TokenType.While,
+							"every" => TokenType.For,
+							"unless" => TokenType.If,
 							"nix" => TokenType.Nix,
-							"new" => TokenType.New,
+							"fresh" => TokenType.New,
 							"var" => TokenType.Var,
-							"num" => TokenType.Num,
-							"obj" => TokenType.Obj,
-							"str" => TokenType.Str,
+							"unrelenting" => TokenType.Const,
+							"digits" => TokenType.Num,
+							"rope" => TokenType.Str,
 							"set" => TokenType.Set,
-							"call" => TokenType.Call,
-							"bool" => TokenType.Bool,
-							"true" => TokenType.True,
-							"else" => TokenType.Else,
-							"void" => TokenType.Void,
-							"false" => TokenType.False,
-							"class" => TokenType.Class,
-							"import" => TokenType.Import,
-							"public" => TokenType.Public,
-							"return" => TokenType.Return,
-							"private" => TokenType.Private,
+							"ring" => TokenType.Call,
+							"maybe" => TokenType.Bool,
+							"yes" => TokenType.True,
+							"yeet" => TokenType.Throw,
+							"otherwise" => TokenType.Else,
+							"nothing" => TokenType.Void,
+							"no" => TokenType.False,
+							"thing" => TokenType.Class,
+							"wield" => TokenType.Import,
+							"accessible" => TokenType.Public,
+							"relinquish" => TokenType.Return,
+							"inaccessible" => TokenType.Private,
 							_ => TokenType.Name,
 						},
 					});
@@ -73,8 +115,10 @@ public static class Tokenizer
 					var type = ch switch
 					{
 						',' => TokenType.Comma,
+						'.' when next is '.' => TokenType.Range,
 						'.' => TokenType.Period,
 						';' => TokenType.Semicolon,
+						'"' => TokenType.Quote,
 
 						'{' => TokenType.OpeningBracket,
 						'}' => TokenType.ClosingBracket,
@@ -87,19 +131,27 @@ public static class Tokenizer
 						'>' when next is '=' => TokenType.LargerThanOrEqual,
 						'>' => TokenType.LargerThan,
 						'<' => TokenType.LessThan,
-						
-						'|' when next is '|' => TokenType.Or,
-						'&' when next is '&' => TokenType.And,
-						'!' when next is '&' => TokenType.NotAnd,
+
+						'|' when next is '|' => TokenType.LogicalOr,
+						'^' when next is '|' => TokenType.LogicalXor,
+						'&' when next is '&' => TokenType.LogicalAnd,
+						'~' when next is '&' => TokenType.LogicalNand,
 						
 						'@' => TokenType.NamespaceTag,
 
+						'^' when next is '^' => TokenType.Exponential,
 						'+' => TokenType.Addition,
 						'/' => TokenType.Division,
-						'^' => TokenType.Exponential,
+						'%' => TokenType.Modulo,
 						'-' => TokenType.Subtraction,
 						'*' => TokenType.Multiplication,
 						'=' => TokenType.AssignmentSeparator,
+						
+						'|' => TokenType.Or,
+						'&' => TokenType.And,
+						'!' => TokenType.Not,
+						'^' => TokenType.Xor,
+						'~' => TokenType.Nand,
 
 						_ => throw new TokenizerException
 						{
@@ -109,24 +161,30 @@ public static class Tokenizer
 							Position = stream.Position,
 						},
 					};
-					
-					tokens.Add(new Token
+
+					var tokenText = type switch
 					{
-						Text = type switch
-						{
-							TokenType.Equal or TokenType.NotEqual or TokenType.LessThanOrEqual or TokenType.LargerThanOrEqual or 
-								TokenType.And or TokenType.NotAnd or TokenType.Or => stream.Peek(2),
-							_ => stream.Peek(1),
-						},
-						Type = type,
-					});
+						TokenType.Equal or TokenType.NotEqual or TokenType.LessThanOrEqual
+							or TokenType.LargerThanOrEqual or
+							TokenType.LogicalAnd or TokenType.LogicalNand or TokenType.LogicalOr or TokenType.LogicalXor
+							or TokenType.Exponential or TokenType.Range => stream.Peek(2),
+						_ => stream.Peek(1),
+					};
+					
+					tokens.Add(new Token { Text = tokenText, Type = type });
+
+					if (tokenText.Length == 2)
+						stream.MoveNext();
 					
 					break;
 				}
 
 				case >= '0' and <= '9':
 				{
-					var number = stream.Peek(c => char.IsDigit(c) || c == '.');
+					var number = stream.Peek((current, next) => char.IsDigit(current) || (
+						current == '.' && char.IsDigit(next ?? default)
+					));
+
 					tokens.Add(new Token
 					{
 						Text = number,

@@ -1,6 +1,6 @@
 ﻿using System.Runtime.InteropServices;
 
-namespace LanguageParser.Tokens;
+namespace LanguageParser.Tokenizer;
 
 public readonly struct Token
 {
@@ -32,6 +32,9 @@ public readonly struct Token
 
 public enum TokenType
 {
+	// ReSharper disable once InconsistentNaming
+	EOF = default,
+	
 	OpeningBracket,
 	ClosingBracket,
 	OpeningParentheses,
@@ -56,9 +59,9 @@ public enum TokenType
 	LargerThanOrEqual,
 	Equal,
 	NotEqual,
-	And,
-	Or,
-	NotAnd,
+	LogicalAnd,
+	LogicalOr,
+	LogicalNand,
 	Class,
 	If,
 	Var,
@@ -73,8 +76,36 @@ public enum TokenType
 	False,
 	Num,
 	Bool,
-	Obj,
 	Str,
+	String,
 	Import,
 	Call,
+	Modulo,
+	Throw,
+	Const,
+	While,
+	LogicalXor,
+	Or,
+	And,
+	Not,
+	Xor,
+	Nand,
+	Quote,
+	Range,
+	For,
+	In,
+}
+
+internal static class TokenExtensions
+{
+	public static bool IsBinaryOp(this TokenType type) => type switch
+	{
+		TokenType.Addition or TokenType.Subtraction or 
+			TokenType.Multiplication or TokenType.Modulo or 
+			TokenType.Division or TokenType.Exponential or TokenType.Range 
+			or TokenType.Equal or TokenType.NotEqual or TokenType.LargerThan or TokenType.LargerThanOrEqual
+			or TokenType.LessThan or TokenType.LessThanOrEqual
+			=> true,
+		_ => false,
+	};
 }

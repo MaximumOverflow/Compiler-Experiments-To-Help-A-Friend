@@ -1,9 +1,10 @@
 ﻿using System.CodeDom.Compiler;
+using System.Collections;
 using System.Reflection;
 
 namespace LanguageParser.AST;
 
-internal partial class ASTNode
+internal partial class AstNode
 {
 	public string GetDebugString(string? indent = null)
 	{
@@ -24,10 +25,13 @@ internal partial class ASTNode
 		{
 			writer.WriteLine(" {}");
 		}
-		else if (indent && (props.Length != 1 || props[0].PropertyType.IsAssignableTo(typeof(ASTNode))))
+		else if (indent && (
+			props.Length != 1 || 
+			props[0].PropertyType.IsAssignableTo(typeof(AstNode)) ||
+			props[0].PropertyType.IsAssignableTo(typeof(IEnumerable))
+		))
 		{
-			writer.WriteLine();
-			writer.WriteLine('{');
+			writer.WriteLine(" {");
 			writer.Indent++;
 
 			for (var i = 0; i < props.Length; i++)
@@ -80,10 +84,64 @@ internal partial class ASTNode
 				writer.Write('"');
 				break;
 			}
+			
+			case ReadOnlyMemory<char> str:
+			{
+				writer.Write('"');
+				writer.Write(str.Span);
+				writer.Write('"');
+				break;
+			}
 
-			case ASTNode node:
+			case AstNode node:
 			{
 				node.WriteDebugString(writer, indent);
+				break;
+			}
+
+			case IEnumerable enumerable:
+			{
+				var values = enumerable.Cast<object?>();
+
+				if (!values.TryGetNonEnumeratedCount(out var count))
+					count = int.MaxValue;
+
+				if (count == 0)
+				{
+					writer.Write("[]");
+					break;
+				}
+				
+				if (indent)
+				{
+					writer.WriteLine('[');
+					writer.Indent++;
+
+					var first = true;
+					foreach (var value in values)
+					{
+						WriteDebugString(writer, value, indent);
+						if(!first) writer.Write(',');
+						writer.WriteLine();
+						first = false;
+					}
+					
+					writer.Indent--;
+					writer.Write(']');
+				}
+				else
+				{
+					writer.Write('[');
+					var first = true;
+					foreach (var value in values)
+					{
+						WriteDebugString(writer, value, indent);
+						if(!first) writer.Write(", ");
+						first = false;
+					}
+					writer.Write(']');
+				}
+				
 				break;
 			}
 

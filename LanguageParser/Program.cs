@@ -1,7 +1,11 @@
-﻿using System.Text.RegularExpressions;
-using LanguageParser.Tokens;
+﻿using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
+using LanguageParser.Tokenizer;
+using LanguageParser.Parser;
 using LanguageParser.AST;
 using System.Text;
+using LanguageParser.Compiler;
+using LLVMSharp.Interop;
 
 namespace LanguageParser
 {
@@ -51,49 +55,32 @@ namespace LanguageParser
             }
             else if (input.StartsWith("$/run"))
             {
-	            List<Token> tokens;
-	            if (input.StartsWith("$/run @"))
-                {
-                    var fileContents = File.ReadAllText(
-	                    input[(input.IndexOf("@", StringComparison.Ordinal) + 1)..]
-	                );
-
-                    tokens = Tokenizer.Tokenize(fileContents);
-
-                    Console.WriteLine();
-                    WriteBlock(fileContents, "\r\n|\r|\n", 0.4f);
-                }
-	            else
-	            {
-		            tokens = Tokenizer.Tokenize(_script.ToString());
-	            }
-                
-	            Console.WriteLine();
-                PrintTokens(tokens, 0.4f); //Testing
-                
-                _script.Clear();
-                var tokenParser = new TokenParser(tokens);
-                var statements = tokenParser.ProcessStatementList(); //temp for testing
-                Console.WriteLine();
-                PrintStatements(statements.StatementNodes, 0.4f);
-                
-                return true;
+	            using var context = new CompilationContext("test");
+				var source = input.StartsWith("$/run @") 
+		            ? File.ReadAllText(input[(input.IndexOf("@", StringComparison.Ordinal) + 1)..]) 
+		            : _script.ToString();
+	            
+	            context.CompileSourceFile(source);
+	            context.LlvmModule.Verify(LLVMVerifierFailureAction.LLVMPrintMessageAction);
+	            context.LlvmModule.Dump();
+	            return false;
             }
-            else if (input == "$/clear")
+            else switch (input)
             {
-                _script.Clear();
-                Console.Clear();
-            }
-            else if (input == "$/help")
-            {
-                Console.WriteLine("- '$/exit' to leave the program.");
-                Console.WriteLine("- '$/run' to execute your script. " +
-                    "Adding a path like so '$/run @D:\\user\\scripts\\test.txt' will run the script within that file.");
-                Console.WriteLine("- '$/clear' to clear your script and the console.");
+	            case "$/clear":
+		            _script.Clear();
+		            Console.Clear();
+		            return false;
+	            case "$/help":
+		            Console.WriteLine("- '$/exit' to leave the program.");
+		            Console.WriteLine("- '$/run' to execute your script. " +
+		                              "Adding a path like so '$/run @D:\\user\\scripts\\test.txt' will run the script within that file.");
+		            Console.WriteLine("- '$/clear' to clear your script and the console.");
+		            return false;
             }
 
             Console.WriteLine("Unknown command. Check your spelling.");
-            return false;
+            return true;
         }
 
         private static void PrintTokens(List<Token> tokens, float delay)
@@ -101,16 +88,7 @@ namespace LanguageParser
 	        foreach (var token in tokens)
 	        {
 		        Console.WriteLine(token.ToString());
-		        Thread.Sleep((int)(delay * 50));
-	        }
-        }
-
-        private static void PrintStatements(List<StatementNode> statements, float delay)
-        {
-	        foreach (var statement in statements)
-	        {
-		        Console.WriteLine(statement.GetDebugString("\t"));
-		        Thread.Sleep((int)(delay * 50));
+		        if(delay != 0) Thread.Sleep((int)(delay * 50));
 	        }
         }
 
@@ -122,7 +100,7 @@ namespace LanguageParser
                 foreach (var c in s)
                 {
                     Console.Write(c);
-                    Thread.Sleep((int)(delay * 50));
+                    if(delay != 0) Thread.Sleep((int)(delay * 50));
                 }
 
                 Console.WriteLine();

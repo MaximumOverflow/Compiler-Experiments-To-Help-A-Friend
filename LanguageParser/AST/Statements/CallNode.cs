@@ -1,6 +1,6 @@
 ﻿namespace LanguageParser.AST;
 
-internal class CallNode : StatementNode
+internal sealed class CallNode : IStatementNode
 {
 	public MethodNode Method { get; }
 

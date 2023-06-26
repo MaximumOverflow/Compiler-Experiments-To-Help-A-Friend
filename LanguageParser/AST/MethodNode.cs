@@ -1,6 +1,6 @@
 ﻿namespace LanguageParser.AST;
 
-internal class MethodNode : ExpressionNode
+internal sealed class MethodNode : ExpressionNode
 {
 	public string Name { get; }
 	public string OriginClass { get; }
