@@ -5,7 +5,7 @@ using System.Numerics;
 
 namespace LanguageParser.AST;
 
-internal sealed class ConstantNode : ExpressionNode, IParameterizedParseableNode<ConstantNode, bool>
+internal sealed class ConstantNode : ExpressionNode, IParseableNode<ConstantNode>
 {
 	public object Value { get; }
 
@@ -27,14 +27,11 @@ internal sealed class ConstantNode : ExpressionNode, IParameterizedParseableNode
 		writer.Write(" }");
 	}
 
-	public static bool TryParse(ref TokenStream stream, bool greedy, out ConstantNode result)
+	public static bool TryParse(ref TokenStream stream, out ConstantNode result)
 	{
 		result = default!;
 		var tokens = stream;
-		
-		if (!greedy && tokens.Next is {} next && next.Type.IsBinaryOp())
-			return false;
-		
+
 		switch (tokens.MoveNext())
 		{
 			case { Type: TokenType.Int } token:

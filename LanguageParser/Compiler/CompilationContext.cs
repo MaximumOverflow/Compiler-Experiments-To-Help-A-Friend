@@ -24,6 +24,7 @@ public sealed class CompilationContext : IDisposable
 			{
 				"nothing".AsMemory(), new Type
 				{
+					Public = true,
 					Name = "nothing".AsMemory(),
 					LlvmType = LlvmContext.VoidType,
 					Members = ImmutableDictionary<ReadOnlyMemory<char>, TypeMember>.Empty,
@@ -33,6 +34,7 @@ public sealed class CompilationContext : IDisposable
 			{
 				"rope".AsMemory(), new Type
 				{
+					Public = true,
 					Name = "rope".AsMemory(),
 					LlvmType = LLVMTypeRef.CreatePointer(LlvmContext.Int8Type, 0),
 					Members = ImmutableDictionary<ReadOnlyMemory<char>, TypeMember>.Empty,
@@ -40,8 +42,19 @@ public sealed class CompilationContext : IDisposable
 			},
 			
 			{
+				"maybe".AsMemory(), new Type
+				{
+					Public = true,
+					Name = "maybe".AsMemory(),
+					LlvmType = LlvmContext.Int1Type,
+					Members = ImmutableDictionary<ReadOnlyMemory<char>, TypeMember>.Empty,
+				}
+			},
+			
+			{
 				"i32".AsMemory(), new Type
 				{
+					Public = true,
 					Name = "i32".AsMemory(),
 					LlvmType = LlvmContext.Int64Type,
 					Members = ImmutableDictionary<ReadOnlyMemory<char>, TypeMember>.Empty,
@@ -51,6 +64,7 @@ public sealed class CompilationContext : IDisposable
 			{
 				"i64".AsMemory(), new Type
 				{
+					Public = true,
 					Name = "i64".AsMemory(),
 					LlvmType = LlvmContext.Int64Type,
 					Members = ImmutableDictionary<ReadOnlyMemory<char>, TypeMember>.Empty,
@@ -60,6 +74,7 @@ public sealed class CompilationContext : IDisposable
 			{
 				"f64".AsMemory(), new Type
 				{
+					Public = true,
 					Name = "f64".AsMemory(),
 					LlvmType = LlvmContext.DoubleType,
 					Members = ImmutableDictionary<ReadOnlyMemory<char>, TypeMember>.Empty,
@@ -75,6 +90,9 @@ public sealed class CompilationContext : IDisposable
 		
 		if (!RootNode.TryParse(ref stream, out var root)) 
 			throw new Exception("Failed to parse root node.");
+		
+		Console.WriteLine();
+		Console.WriteLine(root.GetDebugString("   "));
 
 		if(!Namespaces.TryGetValue(root.Namespace, out var @namespace))
 			Namespaces.Add(root.Namespace, @namespace = new Namespace(root.Namespace));
@@ -118,7 +136,7 @@ internal sealed class FileCompilationContext
 			if(decl is not ClassNode @class) continue;
 			var type = new Type
 			{
-				Name = @class.Name,
+				Name = @class.Name, Public = @class.Public,
 				LlvmType = GlobalContext.LlvmContext.CreateNamedStruct(@class.Name.Span),
 				Members = new Dictionary<ReadOnlyMemory<char>, TypeMember>(@class.Members.Count, MemoryStringComparer.Instance),
 			};
@@ -160,10 +178,10 @@ internal sealed class FileCompilationContext
 
 			var paramTypes = parameters.Select(p => p.Item2.LlvmType).ToArray();
 			var funcType = LLVMTypeRef.CreateFunction(returnType, paramTypes);
-			
+
 			Namespace.Functions.Add(function.Name, new Function
 			{
-				Name = function.Name,
+				Name = function.Name, Public = function.Public,
 				ReturnType = returnType,
 				LlvmValue = GlobalContext.LlvmModule.AddFunction(function.Name.Span, funcType),
 				Parameters = parameters,

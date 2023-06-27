@@ -21,7 +21,7 @@ internal sealed class ReturnNode : AstNode, IStatementNode, IParseableNode<Retur
 		}
 		else
 		{
-			if (!ExpressionNode.TryParse(ref tokens, ExpressionNode.ParsingParams.Default, out value))
+			if (!ExpressionNode.TryParse(ref tokens, false, out value))
 				return false;
 
 			if (!tokens.ExpectToken(TokenType.Semicolon))

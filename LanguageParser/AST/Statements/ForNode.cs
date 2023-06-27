@@ -23,7 +23,7 @@ internal sealed class ForNode : AstNode, IStatementNode, IParseableNode<ForNode>
 		if (!tokens.ExpectToken(TokenType.In))
 			return false;
 		
-		if (!ExpressionNode.TryParse(ref tokens, ExpressionNode.ParsingParams.Default, out var enumerable))
+		if (!ExpressionNode.TryParse(ref tokens, false, out var enumerable))
 			return false;
 
 		if (!BlockNode.TryParse(ref tokens, out var block))

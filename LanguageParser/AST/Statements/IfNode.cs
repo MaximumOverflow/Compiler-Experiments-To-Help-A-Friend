@@ -17,7 +17,7 @@ internal sealed class IfNode : AstNode, IStatementNode, IParseableNode<IfNode>
 		if (tokens.MoveNext() is not { Type: TokenType.If })
 			return false;
 		
-		if (!ExpressionNode.TryParse(ref tokens, ExpressionNode.ParsingParams.Default, out var condition))
+		if (!ExpressionNode.TryParse(ref tokens, false, out var condition))
 			return false;
 
 		if (!BlockNode.TryParse(ref tokens, out var block))

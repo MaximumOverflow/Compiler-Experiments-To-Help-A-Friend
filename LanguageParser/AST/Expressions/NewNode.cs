@@ -3,18 +3,15 @@ using LanguageParser.Parser;
 
 namespace LanguageParser.AST;
 
-internal sealed class NewNode : ExpressionNode, IParameterizedParseableNode<NewNode, int>
+internal sealed class NewNode : ExpressionNode, IParseableNode<NewNode>
 {
 	public required TypeNode Type { get; init; }
 	public required IReadOnlyList<(ReadOnlyMemory<char>, ExpressionNode)> MemberAssignments { get; init; }
 
-	public static bool TryParse(ref TokenStream stream, int recursionChances, out NewNode result)
+	public static bool TryParse(ref TokenStream stream, out NewNode result)
 	{
 		result = default!;
 		var tokens = stream;
-		
-		if (recursionChances == 0) 
-			return false;
 
 		if (tokens.MoveNext() is not { Type: TokenType.New })
 			return false;
@@ -36,7 +33,7 @@ internal sealed class NewNode : ExpressionNode, IParameterizedParseableNode<NewN
 					if (!tokens.ExpectToken(TokenType.AssignmentSeparator))
 						return false;
 
-					if (!ExpressionNode.TryParse(ref tokens, new(false, recursionChances - 1), out var value))
+					if (!ExpressionNode.TryParse(ref tokens, false, out var value))
 						throw new UnexpectedTokenException(tokens.Current ?? throw new EndOfStreamException());
 					
 					if (!tokens.ExpectToken(TokenType.Comma))

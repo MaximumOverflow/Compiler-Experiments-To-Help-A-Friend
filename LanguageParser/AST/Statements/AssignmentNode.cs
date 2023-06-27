@@ -16,7 +16,7 @@ internal sealed class AssignmentNode : AstNode, IStatementNode, IParseableNode<A
 		if (!tokens.ExpectToken(TokenType.Name, out ReadOnlyMemory<char> name)) return false;
 		if (!tokens.ExpectToken(TokenType.AssignmentSeparator)) return false;
 
-		if (!ExpressionNode.TryParse(ref tokens, ExpressionNode.ParsingParams.Default, out var value))
+		if (!ExpressionNode.TryParse(ref tokens, false, out var value))
 			return false;
 
 		if (!tokens.ExpectToken(TokenType.Semicolon))

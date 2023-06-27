@@ -3,18 +3,15 @@ using LanguageParser.Tokenizer;
 
 namespace LanguageParser.AST;
 
-internal sealed class VariableNode : ExpressionNode, IParameterizedParseableNode<VariableNode, bool>
+internal sealed class VariableNode : ExpressionNode, IParseableNode<VariableNode>
 {
 	public required ReadOnlyMemory<char> Name { get; init; }
 
-	public static bool TryParse(ref TokenStream stream, bool greedy, out VariableNode result)
+	public static bool TryParse(ref TokenStream stream, out VariableNode result)
 	{
 		result = default!;
 		var tokens = stream;
-		
-		if (!greedy && tokens.Next is {} next && next.Type.IsBinaryOp())
-			return false;
-		
+
 		if(tokens.MoveNext() is not {Type: TokenType.Name} token)
 			return false;
 

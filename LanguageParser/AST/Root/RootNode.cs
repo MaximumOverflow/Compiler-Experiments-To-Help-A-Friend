@@ -12,6 +12,9 @@ internal sealed class RootNode : AstNode, IParseableNode<RootNode>
 	{
 		result = default!;
 		var tokens = stream;
+
+		if (!tokens.Valid)
+			return false;
 		
 		if(!ImportNode.TryParseNamespace(ref tokens, out var @namespace))
 			throw new UnexpectedTokenException(tokens.Current ?? throw new EndOfStreamException());

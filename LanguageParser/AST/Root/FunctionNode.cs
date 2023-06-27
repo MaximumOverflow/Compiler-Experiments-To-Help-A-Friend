@@ -36,24 +36,27 @@ internal sealed class FunctionNode : AstNode, IRootDeclarationNode, IParseableNo
 		var args = new List<ParameterNode>();
 		while (true)
 		{
+			if (tokens.Current is { Type: TokenType.ClosingParentheses })
+			{
+				tokens.MoveNext();
+				break;
+			}
+			
 			if (!ParameterNode.TryParse(ref tokens, out var param)) 
 				return false;
 			
 			args.Add(param);
-			switch (tokens.MoveNext())
+			
+			if (tokens.Current is { Type: TokenType.ClosingParentheses })
 			{
-				case { Type: TokenType.ClosingParentheses }:
-					goto parse_block;
-					
-				case { Type: TokenType.Comma }:
-					break;
-				
-				case var token:
-					throw new UnexpectedTokenException(token ?? throw new EndOfStreamException());
+				tokens.MoveNext();
+				break;
 			}
+
+			if (!tokens.ExpectToken(TokenType.Comma))
+				return false;
 		}
 
-		parse_block:
 		if (!BlockNode.TryParse(ref tokens, out var block))
 			return false;
 

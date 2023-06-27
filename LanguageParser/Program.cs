@@ -1,11 +1,8 @@
-﻿using System.Runtime.InteropServices;
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using LanguageParser.Tokenizer;
-using LanguageParser.Parser;
-using LanguageParser.AST;
-using System.Text;
 using LanguageParser.Compiler;
 using LLVMSharp.Interop;
+using System.Text;
 
 namespace LanguageParser
 {
@@ -53,19 +50,28 @@ namespace LanguageParser
                 _isRunning = false;
                 return true;
             }
-            else if (input.StartsWith("$/run"))
+
+            if (input.StartsWith("$/run"))
             {
-	            using var context = new CompilationContext("test");
-				var source = input.StartsWith("$/run @") 
-		            ? File.ReadAllText(input[(input.IndexOf("@", StringComparison.Ordinal) + 1)..]) 
-		            : _script.ToString();
+                try
+                {
+                    using var context = new CompilationContext("test");
+                    var source = input.StartsWith("$/run @") 
+                        ? File.ReadAllText(input[(input.IndexOf("@", StringComparison.Ordinal) + 1)..]) 
+                        : _script.ToString();
 	            
-	            context.CompileSourceFile(source);
-	            context.LlvmModule.Verify(LLVMVerifierFailureAction.LLVMPrintMessageAction);
-	            context.LlvmModule.Dump();
+                    context.CompileSourceFile(source);
+                    context.LlvmModule.Dump();
+                    context.LlvmModule.Verify(LLVMVerifierFailureAction.LLVMPrintMessageAction);
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine(e);
+                }
 	            return false;
             }
-            else switch (input)
+
+            switch (input)
             {
 	            case "$/clear":
 		            _script.Clear();

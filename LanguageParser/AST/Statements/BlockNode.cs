@@ -26,9 +26,11 @@ internal sealed class BlockNode : ExpressionNode, IStatementNode, IParseableNode
 			{
 				true when IfNode.TryParse(ref tokens, out var s) => s,
 				true when ForNode.TryParse(ref tokens, out var s) => s,
+				true when WhileNode.TryParse(ref tokens, out var s) => s,
 				true when AssignmentNode.TryParse(ref tokens, out var s) => s,
 				true when VarDeclNode.TryParse(ref tokens, out var s) => s,
 				true when ReturnNode.TryParse(ref tokens, out var s) => s,
+				true when ExpressionNode.TryParse(ref tokens, false, out var s) => s,
 				_ => throw new UnexpectedTokenException(current),
 			};
 

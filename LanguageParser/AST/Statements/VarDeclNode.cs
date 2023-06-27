@@ -22,7 +22,7 @@ internal sealed class VarDeclNode : AstNode, IStatementNode, IParseableNode<VarD
 		if (!tokens.ExpectToken(TokenType.AssignmentSeparator)) 
 			return false;
 		
-		if (!ExpressionNode.TryParse(ref tokens, ExpressionNode.ParsingParams.Default, out var value))
+		if (!ExpressionNode.TryParse(ref tokens, false, out var value))
 			throw new UnexpectedTokenException(tokens.Current!.Value);
 		
 		if (!tokens.ExpectToken(TokenType.Semicolon))

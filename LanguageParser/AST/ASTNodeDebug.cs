@@ -1,6 +1,7 @@
 ﻿using System.CodeDom.Compiler;
 using System.Collections;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 
 namespace LanguageParser.AST;
 
@@ -121,9 +122,8 @@ internal partial class AstNode
 					foreach (var value in values)
 					{
 						WriteDebugString(writer, value, indent);
-						if(!first) writer.Write(',');
+						writer.Write(',');
 						writer.WriteLine();
-						first = false;
 					}
 					
 					writer.Indent--;
@@ -140,6 +140,54 @@ internal partial class AstNode
 						first = false;
 					}
 					writer.Write(']');
+				}
+				
+				break;
+			}
+
+			case ITuple tuple:
+			{
+				var values = tuple
+					.GetType()
+					.GetFields()
+					.Select(m => m.GetValue(tuple));
+
+				if (!values.TryGetNonEnumeratedCount(out var count))
+					count = int.MaxValue;
+
+				if (count == 0)
+				{
+					writer.Write("()");
+					break;
+				}
+				
+				if (indent)
+				{
+					writer.WriteLine('(');
+					writer.Indent++;
+
+					foreach (var value in values)
+					{
+						WriteDebugString(writer, value, indent);
+						writer.Write(',');
+						writer.WriteLine();
+					}
+					
+					writer.Indent--;
+					writer.Write(')');
+				}
+				else
+				{
+					writer.Write('(');
+					var first = true;
+					foreach (var value in values)
+					{
+						WriteDebugString(writer, value, indent);
+						if (!first) writer.Write(", ");
+						first = false;
+					}
+
+					writer.Write(')');
 				}
 				
 				break;
