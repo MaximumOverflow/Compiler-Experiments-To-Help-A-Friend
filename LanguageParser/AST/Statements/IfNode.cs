@@ -3,9 +3,10 @@ using LanguageParser.Parser;
 
 namespace LanguageParser.AST;
 
-internal sealed class IfNode : AstNode, IStatementNode, IParseableNode<IfNode>
+internal sealed class IfNode:  IStatementNode, IParseableNode<IfNode>
 {
-	public required ExpressionNode Condition { get; init; }
+	public bool RequiresSemicolon => false;
+	public required IExpressionNode Condition { get; init; }
 	public required BlockNode Then { get; init; }
 	public required IStatementNode? Else { get; init; }
 
@@ -17,8 +18,8 @@ internal sealed class IfNode : AstNode, IStatementNode, IParseableNode<IfNode>
 		if (tokens.MoveNext() is not { Type: TokenType.If })
 			return false;
 		
-		if (!ExpressionNode.TryParse(ref tokens, false, out var condition))
-			return false;
+		if (!IExpressionNode.TryParse(ref tokens, false, out var condition))
+			return UnexpectedTokenException.Throw<bool>(tokens.Current);
 
 		if (!BlockNode.TryParse(ref tokens, out var block))
 			return false;

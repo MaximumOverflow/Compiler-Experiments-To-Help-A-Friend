@@ -5,7 +5,7 @@ using System.Numerics;
 
 namespace LanguageParser.AST;
 
-internal sealed class ConstantNode : ExpressionNode, IParseableNode<ConstantNode>
+internal sealed class ConstantNode : IExpressionNode, IParseableNode<ConstantNode>
 {
 	public object Value { get; }
 
@@ -14,7 +14,7 @@ internal sealed class ConstantNode : ExpressionNode, IParseableNode<ConstantNode
 		Value = value;
 	}
 
-	public override void WriteDebugString(IndentedTextWriter writer, bool indent = false)
+	public void WriteDebugString(IndentedTextWriter writer, bool indent = false)
 	{
 		writer.Write(nameof(ConstantNode));
 		writer.Write(" { ");

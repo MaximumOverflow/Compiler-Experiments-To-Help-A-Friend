@@ -3,9 +3,10 @@ using LanguageParser.Parser;
 
 namespace LanguageParser.AST;
 
-internal sealed class WhileNode : AstNode, IStatementNode, IParseableNode<WhileNode>
+internal sealed class WhileNode:  IStatementNode, IParseableNode<WhileNode>
 {
-	public required ExpressionNode Condition { get; init; }
+	public bool RequiresSemicolon => false;
+	public required IExpressionNode Condition { get; init; }
 	public required BlockNode Block { get; init; }
 	
 	public static bool TryParse(ref TokenStream stream, out WhileNode result)
@@ -16,8 +17,8 @@ internal sealed class WhileNode : AstNode, IStatementNode, IParseableNode<WhileN
 		if (tokens.MoveNext() is not { Type: TokenType.While })
 			return false;
 
-		if (!ExpressionNode.TryParse(ref tokens, false, out var condition))
-			return false;
+		if (!IExpressionNode.TryParse(ref tokens, false, out var condition))
+			return UnexpectedTokenException.Throw<bool>(tokens.Current);
 
 		if (!BlockNode.TryParse(ref tokens, out var block))
 			return false;

@@ -9,11 +9,11 @@ internal sealed class Block
 	private readonly BlockNode _node;
 	private readonly Function _function;
 	public readonly FileCompilationContext Context;
-	private readonly Dictionary<ReadOnlyMemory<char>, (LLVMValueRef, Type)> _variables;
+	private readonly Dictionary<ReadOnlyMemory<char>, Variable> _variables;
 
-	private LLVMContextRef LlvmContext => Context.GlobalContext.LlvmContext;
-	public IReadOnlyDictionary<ReadOnlyMemory<char>, (LLVMValueRef, Type)> Variables => _variables;
-
+	public LLVMContextRef LlvmContext => Context.GlobalContext.LlvmContext;
+	public IReadOnlyDictionary<ReadOnlyMemory<char>, Variable> Variables => _variables;
+	
 	public Block(BlockNode node, Function function, FileCompilationContext context)
 	{
 		_node = node;
@@ -30,11 +30,14 @@ internal sealed class Block
 		_function = parent._function;
 		_variables = new(parent._variables, MemoryStringComparer.Instance);
 	}
-
-	public (LLVMValueRef, Type)? Compile(LLVMBuilderRef builder, bool connectToParent)
-		=> Compile(builder, connectToParent, out _);
 	
-	public (LLVMValueRef, Type)? Compile(LLVMBuilderRef builder, bool connectToParent, out LLVMBasicBlockRef llvmBlock)
+	public Value Compile(LLVMBuilderRef builder, bool connectToParent)
+		=> Compile(builder, connectToParent, out _, out _);
+
+	public Value Compile(LLVMBuilderRef builder, bool connectToParent, out bool hasReturned)
+		=> Compile(builder, connectToParent, out _, out hasReturned);
+	
+	public Value Compile(LLVMBuilderRef builder, bool connectToParent, out LLVMBasicBlockRef llvmBlock, out bool hasReturned)
 	{
 		var parentBlock = builder.InsertBlock;
 		llvmBlock = LlvmContext.AppendBasicBlock(_function, "");
@@ -42,114 +45,20 @@ internal sealed class Block
 
 		if (_variables.Count == 0)
 		{
-			for (var i = 0; i < _function.Parameters.Count; i++)
+			for (var i = 0; i < _function.Type.ParameterTypes.Count; i++)
 			{
-				var (name, type) = _function.Parameters[i];
+				var name = _function.ParameterNames[i];
+				var type = _function.Type.ParameterTypes[i];
 				var variable = builder.BuildAlloca(type, name.Span);
 				builder.BuildStore(_function.LlvmValue.Params[i], variable);
-				_variables[name] = (variable, type);
+				_variables[name] = new Variable { LlvmValue = variable, Type = type };
 			}
 		}
 
-		(LLVMValueRef, Type)? blockRet = default;
+		hasReturned = false;
+		Value blockRet = new(default, Context.FindType("nothing"));;
 		foreach (var statement in _node.StatementNodes)
-		{
-			switch (statement)
-			{
-				case BlockNode blockNode:
-				{
-					var block = new Block(blockNode, this);
-					blockRet = block.Compile(builder, true);
-					break;
-				}
-
-				case ExpressionNode expr:
-				{
-					var (value, type) = Expressions.CompileExpression(this, builder, expr, false);
-					blockRet = (value, type);
-					break;
-				}
-				
-				case ReturnNode { Value: null }:
-				{
-					if (_function.ReturnType.LlvmType.Kind != LLVMTypeKind.LLVMVoidTypeKind)
-						throw new InvalidOperationException($"Expected value of type '{_function.ReturnType.Name}' found 'nothing'.");
-
-					builder.BuildRetVoid();
-					blockRet = default;
-					break;
-				}
-				
-				case ReturnNode { Value: var expression }:
-				{
-					var (value, _) = Expressions.CompileExpression(this, builder, expression, false);
-					if (_function.ReturnType.LlvmType != value.TypeOf)
-						throw new InvalidOperationException($"Expected value of type '{_function.ReturnType.Name}' found '{value.TypeOf.StructName}'.");
-
-					builder.BuildRet(value);
-					blockRet = default;
-					break;
-				}
-
-				case VarDeclNode { Name: var name, Value: var expr }:
-				{
-					var (value, type) = Expressions.CompileExpression(this, builder, expr, false);
-					var variable = builder.BuildAlloca(type, name.Span);
-					builder.BuildStore(value, variable);
-					_variables[name] = (variable, type);
-					blockRet = default;
-					break;
-				}
-
-				case AssignmentNode { Left.Name: var name, Right: var expr }:
-				{
-					var (variable, varType) = _variables[name];
-					var (value, type) = Expressions.CompileExpression(this, builder, expr, false);
-					
-					if(varType != type) 
-						throw new InvalidCastException($"Cannot convert type '{type.Name}' to type {varType.Name}.");
-
-					builder.BuildStore(value, variable);
-					blockRet = default;
-					break;
-				}
-
-				case WhileNode { Condition: var expr, Block: var blockNode }:
-				{
-					var current = builder.InsertBlock;
-					var check = LlvmContext.AppendBasicBlock(_function, "");
-					var @continue = LlvmContext.AppendBasicBlock(_function, "");
-					
-					// Execute
-					LLVMBasicBlockRef execute;
-					{
-						var block = new Block(blockNode, this);
-						block.Compile(builder, false, out execute);
-						builder.BuildBr(check);
-					}
-
-					// Check
-					{
-						builder.PositionAtEnd(current);
-						builder.BuildBr(check);
-						builder.PositionAtEnd(check);
-						var (condition, type) = Expressions.CompileExpression(this, builder, expr, false);
-						if (type.LlvmType.Kind != LLVMTypeKind.LLVMIntegerTypeKind || type.LlvmType.IntWidth != 1)
-							throw new InvalidCastException($"Cannot convert type '{type.Name}' to type 'maybe'.");
-					
-						builder.BuildCondBr(condition, execute, @continue);
-					}
-
-					builder.PositionAtEnd(@continue);
-					llvmBlock = @continue;
-					blockRet = default;
-					break;
-				}
-
-				default:
-					throw new NotImplementedException($"Could not compile statement of type '{statement.GetType()}'.");
-			}
-		}
+			blockRet = CompileStatement(statement, builder, ref hasReturned);
 
 		if (_parent is not null)
 		{
@@ -171,11 +80,162 @@ internal sealed class Block
 				builder.PositionAtEnd(llvmBlock);
 			}
 		}
-		else if (_function.ReturnType.LlvmType.Kind == LLVMTypeKind.LLVMVoidTypeKind && builder.InsertBlock.Terminator == default)
+		else if (
+			_function.Type.ReturnType.LlvmType.Kind == LLVMTypeKind.LLVMVoidTypeKind && 
+			builder.InsertBlock.Terminator == default
+		)
 		{
 			builder.BuildRetVoid();
 		}
 
 		return blockRet;
 	}
+
+	private Value CompileStatement(IStatementNode statement, LLVMBuilderRef builder, ref bool hasReturned)
+	{
+		if (hasReturned)
+				throw new InvalidOperationException("Statements after return are not allowed.");
+			
+		switch (statement)
+		{
+			case BlockNode blockNode:
+			{
+				var block = new Block(blockNode, this);
+				return block.Compile(builder, true, out hasReturned);
+			}
+
+			case IExpressionNode expr:
+				return Expressions.CompileExpression(this, builder, expr, false);
+
+			case ReturnNode { Value: null }:
+			{
+				var retT = _function.Type.ReturnType;
+				if (retT.LlvmType.Kind != LLVMTypeKind.LLVMVoidTypeKind)
+					throw new InvalidOperationException($"Expected value of type '{retT.Name}' found 'nothing'.");
+
+				hasReturned = true;
+				builder.BuildRetVoid();
+				break;
+			}
+				
+			case ReturnNode { Value: var expression }:
+			{
+				var retT = _function.Type.ReturnType;
+				var (value, type) = Expressions.CompileExpression(this, builder, expression, false);
+					
+				if (type != retT)
+					throw new InvalidOperationException($"Expected value of type '{retT.Name}' found '{type.Name}'.");
+
+				hasReturned = true;
+				builder.BuildRet(value);
+				break;
+			}
+
+			case VarDeclNode { Name: var name, Value: var expr, Constant: var isConstant }:
+			{
+				var (value, type) = Expressions.CompileExpression(this, builder, expr, false);
+				var variable = builder.BuildAlloca(type, name.Span);
+				builder.BuildStore(value, variable);
+				_variables[name] = new Variable
+				{						
+					Type = type,
+					LlvmValue = variable, 
+					Constant = isConstant,
+				};
+					
+				break;
+			}
+
+			case IfNode { Condition: var expr, Then: var thenExpr, Else: var elseStatement }:
+			{
+				var (condition, type) = Expressions.CompileExpression(this, builder, expr, false);
+				if (type != Context.FindType("maybe")) 
+					throw new ArgumentException($"Expected value of type 'maybe', found {type}.");
+					
+				var checkBlock = builder.InsertBlock;
+				var @continue = LlvmContext.AppendBasicBlock(_function, "");
+
+				// Then
+				Value thenRet;
+				LLVMBasicBlockRef thenBlock;
+				{
+					var then = new Block(thenExpr, this);
+					thenRet = then.Compile(builder, false, out thenBlock, out _);
+					builder.BuildBr(@continue);
+					builder.PositionAtEnd(@continue);
+				}
+					
+				// Else
+				Value elseRet;
+				LLVMBasicBlockRef elseBlock;
+				{
+					elseBlock = LlvmContext.AppendBasicBlock(_function, "");
+					builder.PositionAtEnd(elseBlock);
+					if (elseStatement != null)
+					{
+						var dummy = hasReturned;
+						elseRet = CompileStatement(elseStatement, builder, ref dummy);
+					}
+					
+					builder.BuildBr(@continue);
+					builder.PositionAtEnd(@continue);
+				}
+
+				// Check
+				{
+					var current = builder.InsertBlock;
+					builder.PositionAtEnd(checkBlock);
+					builder.BuildCondBr(condition, thenBlock, elseBlock);
+					builder.PositionAtEnd(current);
+				}
+
+				break;
+			}
+
+			case WhileNode { Condition: var expr, Block: var blockNode }:
+			{
+				var current = builder.InsertBlock;
+				var check = LlvmContext.AppendBasicBlock(_function, "");
+				var @continue = LlvmContext.AppendBasicBlock(_function, "");
+					
+				// Execute
+				LLVMBasicBlockRef execute;
+				{
+					var block = new Block(blockNode, this);
+					block.Compile(builder, false, out execute, out _);
+					builder.BuildBr(check);
+				}
+
+				// Check
+				{
+					builder.PositionAtEnd(current);
+					builder.BuildBr(check);
+					builder.PositionAtEnd(check);
+					var (condition, type) = Expressions.CompileExpression(this, builder, expr, false);
+					if (type.LlvmType.Kind != LLVMTypeKind.LLVMIntegerTypeKind || type.LlvmType.IntWidth != 1)
+						throw new InvalidCastException($"Cannot convert type '{type.Name}' to type 'maybe'.");
+					
+					builder.BuildCondBr(condition, execute, @continue);
+				}
+
+				builder.PositionAtEnd(@continue);
+				break;
+			}
+
+			default:
+				throw new NotImplementedException($"Could not compile statement of type '{statement.GetType()}'.");
+		}
+		
+		return new(default, Context.FindType("nothing"));
+	}
+}
+
+internal readonly struct Variable
+{
+	public bool Constant { get; init; }
+	public required Type Type { get; init; }
+	public required LLVMValueRef LlvmValue { get; init; }
+
+	public void Deconstruct(out LLVMValueRef value, out Type type)
+		=> (value, type) = (LlvmValue, Type);
 }

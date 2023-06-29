@@ -2,7 +2,7 @@
 
 namespace LanguageParser.AST;
 
-internal sealed class RootNode : AstNode, IParseableNode<RootNode>
+internal sealed class RootNode : IParseableNode<RootNode>
 {
 	public required ReadOnlyMemory<char> Namespace { get; init; }
 	public required IReadOnlyList<ImportNode> Imports { get; init; }
@@ -17,7 +17,7 @@ internal sealed class RootNode : AstNode, IParseableNode<RootNode>
 			return false;
 		
 		if(!ImportNode.TryParseNamespace(ref tokens, out var @namespace))
-			throw new UnexpectedTokenException(tokens.Current ?? throw new EndOfStreamException());
+			return UnexpectedTokenException.Throw<bool>(tokens.Current);
 
 		var imports = new List<ImportNode>();
 		while (ImportNode.TryParse(ref tokens, out var import))
@@ -26,11 +26,11 @@ internal sealed class RootNode : AstNode, IParseableNode<RootNode>
 		var declarations = new List<IRootDeclarationNode>();
 		while (tokens.Valid)
 		{
-			IRootDeclarationNode decl = true switch
+			var decl = true switch
 			{
-				true when ClassNode.TryParse(ref tokens, out var res) => res,
+				true when StructNode.TryParse(ref tokens, out var res) => res,
 				true when FunctionNode.TryParse(ref tokens, out var res) => res,
-				_ => throw new UnexpectedTokenException(tokens.Current!.Value),
+				_ => UnexpectedTokenException.Throw<IRootDeclarationNode>(tokens.Current),
 			};
 			declarations.Add(decl);
 		}

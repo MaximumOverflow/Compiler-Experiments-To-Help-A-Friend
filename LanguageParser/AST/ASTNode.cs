@@ -1,14 +1,20 @@
-﻿using System.Runtime.InteropServices;
-using LanguageParser.Parser;
+﻿using System.Diagnostics;
+using System.Runtime.InteropServices;
 using LanguageParser.Tokenizer;
+using LanguageParser.Parser;
 
 namespace LanguageParser.AST;
 
-internal partial class AstNode {}
-internal interface IStatementNode {}
-internal interface IRootDeclarationNode {}
+public partial interface IAstNode {}
+internal interface IRootDeclarationNode : IAstNode {}
 
-internal interface IParseableNode<TSelf>
+internal interface IStatementNode : IAstNode
+{
+	public bool RequiresSemicolon => true;
+}
+
+
+internal interface IParseableNode<TSelf> : IAstNode
 {
 	public static abstract bool TryParse(ref TokenStream stream, out TSelf result);
 }
@@ -54,5 +60,11 @@ public sealed class UnexpectedTokenException : Exception
 				else Column++;
 			}
 		}
+	}
+
+	public static T Throw<T>(Token? token, TokenType? expected = null)
+	{
+		Debugger.Break();
+		throw new UnexpectedTokenException(token ?? throw new EndOfStreamException(), expected);
 	}
 }

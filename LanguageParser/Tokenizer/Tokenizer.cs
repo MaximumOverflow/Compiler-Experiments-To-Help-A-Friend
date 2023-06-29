@@ -49,8 +49,15 @@ public static class Tokenizer
 					stream.MoveNext();
 					var stringText = stream.Peek(ref last, (ref char l, char c) =>
 					{
-						if (c != '"') return true;
-						if (l != '\\') return false;
+						if (c != '"')
+						{
+							l = c;
+							return true;
+						}
+						
+						if (l != '\\') 
+							return false;
+						
 						l = c;
 						return true;
 					});
@@ -84,12 +91,11 @@ public static class Tokenizer
 							"nix" => TokenType.Nix,
 							"fresh" => TokenType.New,
 							"var" => TokenType.Var,
+							"foreign" => TokenType.External,
 							"unrelenting" => TokenType.Const,
-							"digits" => TokenType.Num,
-							"rope" => TokenType.Str,
+							"decoupled" => TokenType.Static,
+							"mystery" => TokenType.Undefined,
 							"set" => TokenType.Set,
-							"ring" => TokenType.Call,
-							"maybe" => TokenType.Bool,
 							"yes" => TokenType.True,
 							"yeet" => TokenType.Throw,
 							"otherwise" => TokenType.Else,
@@ -100,11 +106,37 @@ public static class Tokenizer
 							"accessible" => TokenType.Public,
 							"relinquish" => TokenType.Return,
 							"inaccessible" => TokenType.Private,
+							"__type_id__" => TokenType.TypeId,
 							_ => TokenType.Name,
 						},
 					});
 
 					stream.Position += keyword.Length - 1;
+					break;
+				}
+
+				case '.':
+				{
+					var count = 1;
+					var clone = stream;
+					var type = TokenType.Period;
+					
+					if (stream.Next == '.')
+					{
+						stream.MoveNext();
+						type = TokenType.Range;
+						count++;
+					}
+					
+					if (stream.Next == '.')
+					{
+						stream.MoveNext();
+						type = TokenType.VariadicExpansion;
+						count++;
+					}
+
+					var tokenText = clone.Peek(count);
+					tokens.Add(new Token { Text = tokenText, Type = type });
 					break;
 				}
 
@@ -115,15 +147,15 @@ public static class Tokenizer
 					var type = ch switch
 					{
 						',' => TokenType.Comma,
-						'.' when next is '.' => TokenType.Range,
-						'.' => TokenType.Period,
 						';' => TokenType.Semicolon,
 						'"' => TokenType.Quote,
-
-						'{' => TokenType.OpeningBracket,
-						'}' => TokenType.ClosingBracket,
-						'(' => TokenType.OpeningParentheses,
-						')' => TokenType.ClosingParentheses,
+						
+						'(' => TokenType.OpenRound,
+						'{' => TokenType.OpenCurly,
+						'[' => TokenType.OpenSquare,
+						')' => TokenType.CloseRound,
+						'}' => TokenType.CloseCurly,
+						']' => TokenType.CloseSquare,
 
 						'=' when next is '=' => TokenType.Equal,
 						'!' when next is '=' => TokenType.NotEqual,

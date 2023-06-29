@@ -3,10 +3,10 @@ using LanguageParser.Parser;
 
 namespace LanguageParser.AST;
 
-internal sealed class NewNode : ExpressionNode, IParseableNode<NewNode>
+internal sealed class NewNode : IExpressionNode, IParseableNode<NewNode>
 {
 	public required TypeNode Type { get; init; }
-	public required IReadOnlyList<(ReadOnlyMemory<char>, ExpressionNode)> MemberAssignments { get; init; }
+	public required IReadOnlyList<(ReadOnlyMemory<char>, IExpressionNode)> MemberAssignments { get; init; }
 
 	public static bool TryParse(ref TokenStream stream, out NewNode result)
 	{
@@ -17,12 +17,12 @@ internal sealed class NewNode : ExpressionNode, IParseableNode<NewNode>
 			return false;
 
 		if (!TypeNode.TryParse(ref tokens, out var type))
-			throw new UnexpectedTokenException(tokens.Current ?? throw new EndOfStreamException());
+			return UnexpectedTokenException.Throw<bool>(tokens.Current);
 
-		if (!tokens.ExpectToken(TokenType.OpeningBracket))
+		if (!tokens.ExpectToken(TokenType.OpenCurly))
 			return false;
 
-		var memberAssignments = new List<(ReadOnlyMemory<char>, ExpressionNode)>();
+		var memberAssignments = new List<(ReadOnlyMemory<char>, IExpressionNode)>();
 		while (true)
 		{
 			var exit = false;
@@ -33,23 +33,36 @@ internal sealed class NewNode : ExpressionNode, IParseableNode<NewNode>
 					if (!tokens.ExpectToken(TokenType.AssignmentSeparator))
 						return false;
 
-					if (!ExpressionNode.TryParse(ref tokens, false, out var value))
-						throw new UnexpectedTokenException(tokens.Current ?? throw new EndOfStreamException());
-					
-					if (!tokens.ExpectToken(TokenType.Comma))
-						return false;
-					
+					if (!IExpressionNode.TryParse(ref tokens, false, out var value))
+						return UnexpectedTokenException.Throw<bool>(tokens.Current);
+
 					memberAssignments.Add((token.Text, value));
+
+					switch (tokens.MoveNext())
+					{
+						case {Type: TokenType.Comma}:
+							break;
+						
+						case {Type: TokenType.CloseCurly}:
+							exit = true;
+							break;
+						
+						case null:
+							throw new EndOfStreamException();
+						
+						case {} unexpected:
+							return UnexpectedTokenException.Throw<bool>(unexpected);
+					}
 					
 					break;
 				}
 				
-				case {Type: TokenType.ClosingBracket}:
+				case {Type: TokenType.CloseCurly}:
 					exit = true;
 					break;
 					
 				case null: throw new EndOfStreamException();
-				case {} token: throw new UnexpectedTokenException(token);
+				case {} token: return UnexpectedTokenException.Throw<bool>(token);
 			}
 			
 			if(exit)

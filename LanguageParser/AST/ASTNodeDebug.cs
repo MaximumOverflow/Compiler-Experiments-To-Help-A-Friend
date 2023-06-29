@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 
 namespace LanguageParser.AST;
 
-internal partial class AstNode
+public partial interface IAstNode
 {
 	public string GetDebugString(string? indent = null)
 	{
@@ -28,7 +28,7 @@ internal partial class AstNode
 		}
 		else if (indent && (
 			props.Length != 1 || 
-			props[0].PropertyType.IsAssignableTo(typeof(AstNode)) ||
+			props[0].PropertyType.IsAssignableTo(typeof(IAstNode)) ||
 			props[0].PropertyType.IsAssignableTo(typeof(IEnumerable))
 		))
 		{
@@ -94,7 +94,7 @@ internal partial class AstNode
 				break;
 			}
 
-			case AstNode node:
+			case IAstNode node:
 			{
 				node.WriteDebugString(writer, indent);
 				break;
@@ -118,7 +118,6 @@ internal partial class AstNode
 					writer.WriteLine('[');
 					writer.Indent++;
 
-					var first = true;
 					foreach (var value in values)
 					{
 						WriteDebugString(writer, value, indent);

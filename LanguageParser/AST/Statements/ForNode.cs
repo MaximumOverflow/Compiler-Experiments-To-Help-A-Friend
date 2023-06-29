@@ -3,10 +3,11 @@ using LanguageParser.Parser;
 
 namespace LanguageParser.AST;
 
-internal sealed class ForNode : AstNode, IStatementNode, IParseableNode<ForNode>
+internal sealed class ForNode:  IStatementNode, IParseableNode<ForNode>
 {
+	public bool RequiresSemicolon => false;
 	public required ReadOnlyMemory<char> Var { get; init; }
-	public required ExpressionNode Enumerable { get; init; }
+	public required IExpressionNode Enumerable { get; init; }
 	public required BlockNode Block { get; init; }
 	
 	public static bool TryParse(ref TokenStream stream, out ForNode result)
@@ -23,8 +24,8 @@ internal sealed class ForNode : AstNode, IStatementNode, IParseableNode<ForNode>
 		if (!tokens.ExpectToken(TokenType.In))
 			return false;
 		
-		if (!ExpressionNode.TryParse(ref tokens, false, out var enumerable))
-			return false;
+		if (!IExpressionNode.TryParse(ref tokens, false, out var enumerable))
+			return UnexpectedTokenException.Throw<bool>(tokens.Current);
 
 		if (!BlockNode.TryParse(ref tokens, out var block))
 			return false;

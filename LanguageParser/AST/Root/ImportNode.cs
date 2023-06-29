@@ -4,7 +4,7 @@ using LanguageParser.Parser;
 
 namespace LanguageParser.AST;
 
-internal sealed class ImportNode : AstNode, IParseableNode<ImportNode>
+internal sealed class ImportNode : IParseableNode<ImportNode>
 {
 	public required ReadOnlyMemory<char> Namespace { get; init; }
 	
@@ -17,7 +17,7 @@ internal sealed class ImportNode : AstNode, IParseableNode<ImportNode>
 			return false;
 
 		if (!TryParseNamespace(ref tokens, out var @namespace))
-			throw new UnexpectedTokenException(tokens.Current ?? throw new EndOfStreamException());
+			return UnexpectedTokenException.Throw<bool>(tokens.Current);
 
 		stream = tokens;
 		result = new ImportNode { Namespace = @namespace };
@@ -50,7 +50,7 @@ internal sealed class ImportNode : AstNode, IParseableNode<ImportNode>
 					break;
 				
 				case {} token:
-					throw new UnexpectedTokenException(token, TokenType.Name);
+					return UnexpectedTokenException.Throw<bool>(token, TokenType.Name);
 			}
 
 			if (exit) 

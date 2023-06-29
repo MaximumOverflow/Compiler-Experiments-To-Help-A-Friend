@@ -1,9 +1,9 @@
-﻿using LanguageParser.Parser;
-using LanguageParser.Tokenizer;
+﻿using LanguageParser.Tokenizer;
+using LanguageParser.Parser;
 
 namespace LanguageParser.AST;
 
-internal sealed class VariableNode : ExpressionNode, IParseableNode<VariableNode>
+internal sealed class VariableNode : IExpressionNode, IParseableNode<VariableNode>
 {
 	public required ReadOnlyMemory<char> Name { get; init; }
 

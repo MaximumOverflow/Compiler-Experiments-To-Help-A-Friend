@@ -3,8 +3,9 @@ using LanguageParser.Parser;
 
 namespace LanguageParser.AST;
 
-internal sealed class BlockNode : ExpressionNode, IStatementNode, IParseableNode<BlockNode>
+internal sealed class BlockNode : IExpressionNode, IStatementNode, IParseableNode<BlockNode>
 {
+	public bool RequiresSemicolon => false;
 	public IReadOnlyList<IStatementNode> StatementNodes { get; }
 
 	public BlockNode(IReadOnlyList<IStatementNode> statements)
@@ -16,28 +17,54 @@ internal sealed class BlockNode : ExpressionNode, IStatementNode, IParseableNode
 	{
 		result = default!;
 		var tokens = stream;
-		if (tokens.MoveNext() is not {Type: TokenType.OpeningBracket})
+		if (tokens.MoveNext() is not {Type: TokenType.OpenCurly})
 			return false;
 		
 		var statements = new List<IStatementNode>();
-		while (tokens.Current is { Type: not TokenType.ClosingBracket } current)
+		while (tokens.Current is { Type: not TokenType.CloseCurly } current)
 		{
 			IStatementNode statement = true switch
 			{
-				true when IfNode.TryParse(ref tokens, out var s) => s,
-				true when ForNode.TryParse(ref tokens, out var s) => s,
-				true when WhileNode.TryParse(ref tokens, out var s) => s,
-				true when AssignmentNode.TryParse(ref tokens, out var s) => s,
-				true when VarDeclNode.TryParse(ref tokens, out var s) => s,
-				true when ReturnNode.TryParse(ref tokens, out var s) => s,
-				true when ExpressionNode.TryParse(ref tokens, false, out var s) => s,
+				_ when IfNode.TryParse(ref tokens, out var s) => s,
+				_ when ForNode.TryParse(ref tokens, out var s) => s,
+				_ when WhileNode.TryParse(ref tokens, out var s) => s,
+				_ when VarDeclNode.TryParse(ref tokens, out var s) => s,
+				_ when ReturnNode.TryParse(ref tokens, out var s) => s,
+				_ when IExpressionNode.TryParse(ref tokens, false, out var s) => s,
 				_ => throw new UnexpectedTokenException(current),
 			};
 
-			statements.Add(statement);
+			switch (tokens.Current)
+			{
+				case { Type: TokenType.CloseCurly } when statement is IExpressionNode:
+				{
+					tokens.MoveNext();
+					statements.Add(statement);
+
+					stream = tokens;
+					result = new BlockNode(statements);
+					return true;
+				}
+
+				case var _ when !statement.RequiresSemicolon:
+				{
+					statements.Add(statement);
+					break;
+				}
+				
+				case { Type: TokenType.Semicolon } when statement.RequiresSemicolon:
+				{
+					tokens.MoveNext();
+					statements.Add(statement);
+					break;
+				}
+
+				default: 
+					return UnexpectedTokenException.Throw<bool>(tokens.Current);
+			}
 		}
 
-		tokens.MoveNext();
+		tokens.ExpectToken(TokenType.CloseCurly);
 		
 		stream = tokens;
 		result = new BlockNode(statements);

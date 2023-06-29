@@ -3,13 +3,13 @@ using LanguageParser.Tokenizer;
 
 namespace LanguageParser.AST;
 
-internal sealed class ClassNode : AstNode, IRootDeclarationNode, IParseableNode<ClassNode>
+internal sealed class StructNode : IRootDeclarationNode, IParseableNode<StructNode>
 {
 	public required bool Public { get; init; }
 	public required ReadOnlyMemory<char> Name { get; init; }
 	public required IReadOnlyList<ClassMemberNode> Members { get; init; }
 	
-	public static bool TryParse(ref TokenStream stream, out ClassNode result)
+	public static bool TryParse(ref TokenStream stream, out StructNode result)
 	{
 		result = default!;
 		var tokens = stream;
@@ -28,20 +28,20 @@ internal sealed class ClassNode : AstNode, IRootDeclarationNode, IParseableNode<
 		if (!tokens.ExpectToken(TokenType.Name, out ReadOnlyMemory<char> name))
 			return false;
 
-		if (!tokens.ExpectToken(TokenType.OpeningBracket))
+		if (!tokens.ExpectToken(TokenType.OpenCurly))
 			return false;
 
 		var members = new List<ClassMemberNode>();
-		while (tokens.Current is not {Type: TokenType.ClosingBracket})
+		while (tokens.Current is not {Type: TokenType.CloseCurly})
 		{
 			if(ClassMemberNode.TryParse(ref tokens, out var member))
 				members.Add(member);
 		}
 
-		tokens.ExpectToken(TokenType.ClosingBracket);
+		tokens.ExpectToken(TokenType.CloseCurly);
 		
 		stream = tokens;
-		result = new ClassNode
+		result = new StructNode
 		{
 			Name = name,
 			Public = @public,
@@ -51,7 +51,7 @@ internal sealed class ClassNode : AstNode, IRootDeclarationNode, IParseableNode<
 	}
 }
 
-internal sealed class ClassMemberNode : AstNode, IParseableNode<ClassMemberNode>
+internal sealed class ClassMemberNode : IParseableNode<ClassMemberNode>
 {
 	public required bool Public { get; init; }
 	public required bool Const { get; init; }
@@ -68,7 +68,7 @@ internal sealed class ClassMemberNode : AstNode, IParseableNode<ClassMemberNode>
 			{ Type: TokenType.Public } => true,
 			{ Type: TokenType.Private } => false,
 			null => throw new EndOfStreamException(),
-			{} token => throw new UnexpectedTokenException(token),
+			{} token => UnexpectedTokenException.Throw<bool>(token),
 		};
 
 		var @const = false;
@@ -79,7 +79,7 @@ internal sealed class ClassMemberNode : AstNode, IParseableNode<ClassMemberNode>
 		}
 
 		if (!TypeNode.TryParse(ref tokens, out var type))
-			throw new UnexpectedTokenException(tokens.Current ?? throw new EndOfStreamException());
+			return UnexpectedTokenException.Throw<bool>(tokens.Current);
 
 		if (!tokens.ExpectToken(TokenType.Name, out ReadOnlyMemory<char> name))
 			return false;

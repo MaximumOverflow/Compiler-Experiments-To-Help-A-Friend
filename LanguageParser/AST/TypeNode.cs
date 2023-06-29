@@ -1,12 +1,10 @@
-﻿using LanguageParser.Parser;
-using LanguageParser.Tokenizer;
+﻿using LanguageParser.Tokenizer;
+using LanguageParser.Parser;
 
 namespace LanguageParser.AST;
 
-internal sealed class TypeNode : AstNode, IParseableNode<TypeNode>
+internal abstract class TypeNode : IParseableNode<TypeNode>
 {
-	public required ReadOnlyMemory<char> Name { get; init; }
-	
 	public static bool TryParse(ref TokenStream stream, out TypeNode result)
 	{
 		result = default!;
@@ -14,8 +12,24 @@ internal sealed class TypeNode : AstNode, IParseableNode<TypeNode>
 		
 		switch (tokens.MoveNext())
 		{
-			case {Type: TokenType.Name or TokenType.Str or TokenType.Num or TokenType.Void} token: 
-				result = new TypeNode { Name = token.Text };
+			case { Type: TokenType.Multiplication }:
+			{
+				var @const = false;
+				if (tokens.Current is { Type: TokenType.Const })
+				{
+					tokens.MoveNext();
+					@const = true;
+				}
+				
+				if (!TryParse(ref tokens, out var @base))
+					return false;
+				
+				result = new PointerTypeNode { Base = @base, Constant = @const };
+				break;
+			}
+			
+			case {Type: TokenType.Name } token: 
+				result = new TypeNameNode { Name = token.Text };
 				break;
 
 			case null: throw new EndOfStreamException();
@@ -25,4 +39,15 @@ internal sealed class TypeNode : AstNode, IParseableNode<TypeNode>
 		stream = tokens;
 		return true;
 	}
+}
+
+internal sealed class TypeNameNode : TypeNode
+{
+	public required ReadOnlyMemory<char> Name { get; init; }
+}
+
+internal sealed class PointerTypeNode : TypeNode
+{
+	public required bool Constant { get; init; }
+	public required TypeNode Base { get; init; }
 }

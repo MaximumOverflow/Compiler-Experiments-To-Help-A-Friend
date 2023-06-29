@@ -66,7 +66,7 @@ public ref struct TokenStream
 		}
 
 		token = t;
-		return t.Type == type ? true : throw new UnexpectedTokenException(t, type);
+		return t.Type == type || UnexpectedTokenException.Throw<bool>(t, type);
 	}
 
 	public bool ExpectToken(TokenType type, out ReadOnlyMemory<char> text)

@@ -3,9 +3,9 @@ using LanguageParser.Parser;
 	
 namespace LanguageParser.AST;
 
-internal sealed class ReturnNode : AstNode, IStatementNode, IParseableNode<ReturnNode>
+internal sealed class ReturnNode:  IStatementNode, IParseableNode<ReturnNode>
 {
-	public required ExpressionNode? Value { get; init; }
+	public required IExpressionNode? Value { get; init; }
 	public static bool TryParse(ref TokenStream stream, out ReturnNode result)
 	{
 		result = default!;
@@ -14,19 +14,10 @@ internal sealed class ReturnNode : AstNode, IStatementNode, IParseableNode<Retur
 		if (tokens.MoveNext() is not { Type: TokenType.Return })
 			return false;
 
-		ExpressionNode? value = null;
-		if (tokens.Current is { Type: TokenType.Semicolon })
-		{
-			tokens.MoveNext();
-		}
-		else
-		{
-			if (!ExpressionNode.TryParse(ref tokens, false, out value))
-				return false;
-
-			if (!tokens.ExpectToken(TokenType.Semicolon))
-				return false;
-		}
+		IExpressionNode? value = null;
+		if (tokens.Current is { Type: TokenType.Semicolon }) tokens.MoveNext();
+		else if (!IExpressionNode.TryParse(ref tokens, false, out value))
+			return UnexpectedTokenException.Throw<bool>(tokens.Current);
 
 		stream = tokens;
 		result = new ReturnNode { Value = value };
