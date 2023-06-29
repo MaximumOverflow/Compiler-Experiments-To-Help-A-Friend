@@ -31,8 +31,8 @@ namespace LanguageParser
             var compilationSettings = new CompilationSettings
             {
 	            ModuleName = "Test",
-	            OptimizationLevel = 0,
-	            EmitReflectionInformation = false,
+	            OptimizationLevel = 3,
+	            EmitReflectionInformation = true,
             };
             
             while (_isRunning)

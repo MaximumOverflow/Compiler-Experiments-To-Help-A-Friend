@@ -49,7 +49,10 @@ public sealed partial class CompilationContext : IDisposable
 			Metadata.Add(MetadataTableFn.AsMemory(), new Value(gep, fnTableRefT.MakePointer(true)));
 		}
 		
-		Metadata.Add("__ModuleName__".AsMemory(), MakeConstString(CompilationSettings.ModuleName.AsMemory()));
+		Metadata.Add(
+			"__ModuleName__".AsMemory(), 
+			MakeConstString(CompilationSettings.ModuleName.AsMemory(), LLVMUnnamedAddr.LLVMLocalUnnamedAddr)
+		);
 	}
 
 	private void InitializeReflectionTypes(out StructType tables, out StructType tyTableRef, out StructType fnTableRef)
@@ -128,7 +131,7 @@ public sealed partial class CompilationContext : IDisposable
 			return _types.Values
 				.Select(t => LLVMValueRef.CreateConstNamedStruct(type, stackalloc LLVMValueRef[]
 				{
-					MakeConstString(t.Item2.Name).LlvmValue,
+					MakeConstString(t.Item2.Name, LLVMUnnamedAddr.LLVMLocalUnnamedAddr).LlvmValue,
 				}))
 				.ToArray();
 		}, "types", MetadataTableTy);
@@ -140,7 +143,7 @@ public sealed partial class CompilationContext : IDisposable
 				.Select(f => LLVMValueRef.CreateConstNamedStruct(type, stackalloc LLVMValueRef[]
 				{
 					LLVMValueRef.CreateConstBitCast(f.LlvmValue, i8Ptr),
-					MakeConstString(f.Name).LlvmValue,
+					MakeConstString(f.Name, LLVMUnnamedAddr.LLVMLocalUnnamedAddr).LlvmValue,
 					LLVMValueRef.CreateConstGEP2(typeT, types, new ReadOnlySpan<LLVMValueRef>(f.Type.LlvmMetadataTableOffset)),
 				}))
 				.ToArray();

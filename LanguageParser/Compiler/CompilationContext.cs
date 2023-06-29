@@ -12,7 +12,6 @@ public sealed partial class CompilationContext : IDisposable
 	private bool _finalized;
 	public LLVMModuleRef LlvmModule;
 	public LLVMContextRef LlvmContext;
-	public LLVMPassManagerRef LlvmPassManager;
 	public readonly CompilationSettings CompilationSettings;
 	
 	private readonly Dictionary<ReadOnlyMemory<char>, Value> _strings;
@@ -26,15 +25,6 @@ public sealed partial class CompilationContext : IDisposable
 		
 		LlvmContext = LLVMContextRef.Create();
 		LlvmModule = LlvmContext.CreateModuleWithName(compilationSettings.ModuleName);
-		
-		unsafe
-		{
-			using LLVMPassManagerBuilderRef passManagerBuilder = LLVM.PassManagerBuilderCreate();
-			LLVM.PassManagerBuilderSetOptLevel(passManagerBuilder, compilationSettings.OptimizationLevel);
-			LlvmPassManager = LlvmModule.CreateFunctionPassManager();
-			passManagerBuilder.PopulateFunctionPassManager(LlvmPassManager);
-			LlvmPassManager.InitializeFunctionPassManager();
-		}
 
 		_strings = new Dictionary<ReadOnlyMemory<char>, Value>(MemoryStringComparer.Instance);
 		Namespaces = new Dictionary<ReadOnlyMemory<char>, Namespace>(MemoryStringComparer.Instance);
@@ -65,8 +55,8 @@ public sealed partial class CompilationContext : IDisposable
 		if (!RootNode.TryParse(ref stream, out var root)) 
 			throw new Exception("Failed to parse root node.");
 		
-		Console.WriteLine();
-		Console.WriteLine(((IAstNode) root).GetDebugString("   "));
+		// Console.WriteLine();
+		// Console.WriteLine(((IAstNode) root).GetDebugString("   "));
 
 		if(!Namespaces.TryGetValue(root.Namespace, out var @namespace))
 			Namespaces.Add(root.Namespace, @namespace = new Namespace(root.Namespace));
@@ -80,12 +70,33 @@ public sealed partial class CompilationContext : IDisposable
 	{
 		_finalized = true;
 		FinalizeReflectionInformation();
-		LlvmModule.Verify(LLVMVerifierFailureAction.LLVMPrintMessageAction);
-		foreach (var fn in Namespaces.Values.SelectMany(ns => ns.Functions.Values))
-			LlvmPassManager.RunFunctionPassManager(fn);
+		LlvmModule.Verify(LLVMVerifierFailureAction.LLVMAbortProcessAction);
+		
+		unsafe
+		{
+			using LLVMPassManagerBuilderRef passManagerBuilder = LLVM.PassManagerBuilderCreate();
+			LLVM.PassManagerBuilderSetOptLevel(passManagerBuilder, CompilationSettings.OptimizationLevel);
+			
+			using LLVMPassManagerRef modulePassManager = LLVM.CreatePassManager();
+			passManagerBuilder.PopulateModulePassManager(modulePassManager);
+			
+			using var functionPassManager = LlvmModule.CreateFunctionPassManager();
+			passManagerBuilder.PopulateFunctionPassManager(functionPassManager);
+			functionPassManager.InitializeFunctionPassManager();
+			
+			modulePassManager.Run(LlvmModule);
+
+			foreach (var fn in Namespaces.Values.SelectMany(ns => ns.Functions.Values))
+				functionPassManager.RunFunctionPassManager(fn);
+			
+			modulePassManager.Run(LlvmModule);
+		}
 	}
 
-	internal Value MakeConstString(ReadOnlyMemory<char> str)
+	internal unsafe Value MakeConstString(
+		ReadOnlyMemory<char> str, 
+		LLVMUnnamedAddr unnamedAddr = LLVMUnnamedAddr.LLVMNoUnnamedAddr
+	)
 	{
 		if (_strings.TryGetValue(str, out var value))
 			return value;
@@ -93,6 +104,7 @@ public sealed partial class CompilationContext : IDisposable
 		var unescaped = Regex.Unescape(str.ToString());
 		var constStr = LlvmContext.GetConstString(unescaped, false);
 		var global = LlvmModule.AddGlobal(constStr.TypeOf, $"__ConstStr{_strings.Count}__");
+		LLVM.SetUnnamedAddress(global, unnamedAddr);
 		global.Initializer = constStr;
 		
 		var i8Ptr = DefaultTypes["i8".AsMemory()].MakePointer();
