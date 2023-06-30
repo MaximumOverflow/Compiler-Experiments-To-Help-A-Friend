@@ -1,6 +1,4 @@
 ﻿using System.Diagnostics;
-using LLVMSharp.Interop;
-using Squyrm.Utilities;
 using Squyrm.Compiler;
 using Squyrm.BindGen;
 using System.Text;
@@ -15,13 +13,6 @@ internal class Program
 
 	public static void Main()
 	{
-		LLVM.LinkInMCJIT();
-		LLVM.InitializeX86TargetInfo();
-		LLVM.InitializeX86Target();
-		LLVM.InitializeX86TargetMC();
-		LLVM.InitializeX86AsmParser();
-		LLVM.InitializeX86AsmPrinter();
-
 		var bindingsStats = new RuntimeStats();
 		var bindings = CBindingsGenerator.GenerateSquyrmBindings(
 			"C:/Program Files (x86)/Windows Kits/10/Include/10.0.19041.0/ucrt/stdlib.h",
@@ -37,7 +28,7 @@ internal class Program
 				ModuleName = "@CStdLib.StdIO", EmitReflectionInformation = true,
 			});
 	            
-			context.CompileSourceFile(bindings);
+			context.CompileSourceCode(bindings);
 			context.FinalizeCompilation();
 			compilationStats.Dump("Bindings compilation", ConsoleColor.Green);
 		}
@@ -128,7 +119,7 @@ internal class Program
 				{
 					var stats = new RuntimeStats();
 					context = new CompilationContext(settings);
-					context.CompileSourceFile(source);
+					context.CompileSourceCode(source);
 					context.FinalizeCompilation();
 					stats.Dump("Compilation", ConsoleColor.Green);
 				}

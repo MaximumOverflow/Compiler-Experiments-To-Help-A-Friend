@@ -1,4 +1,5 @@
-﻿using ClangSharp.Interop;
+﻿using System.CodeDom.Compiler;
+using ClangSharp.Interop;
 using System.Text;
 using ClangSharp;
 using Pastel;

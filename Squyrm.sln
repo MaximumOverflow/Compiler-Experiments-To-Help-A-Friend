@@ -3,9 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.5.33627.172
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LanguageParser", "LanguageParser\LanguageParser.csproj", "{4DA16541-78E7-4304-84E7-A606A8EDDBC1}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Parser", "Parser\Parser.csproj", "{4DA16541-78E7-4304-84E7-A606A8EDDBC1}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LanguageCompiler", "LanguageCompiler\LanguageCompiler.csproj", "{AD6D2DC6-F66F-4030-BA23-21A16B886FAF}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Compiler", "Compiler\Compiler.csproj", "{AD6D2DC6-F66F-4030-BA23-21A16B886FAF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CLI", "CLI\CLI.csproj", "{57F5E015-F77B-470B-A329-5F9FF9769C2E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,6 +23,10 @@ Global
 		{AD6D2DC6-F66F-4030-BA23-21A16B886FAF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{AD6D2DC6-F66F-4030-BA23-21A16B886FAF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{AD6D2DC6-F66F-4030-BA23-21A16B886FAF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{57F5E015-F77B-470B-A329-5F9FF9769C2E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{57F5E015-F77B-470B-A329-5F9FF9769C2E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{57F5E015-F77B-470B-A329-5F9FF9769C2E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{57F5E015-F77B-470B-A329-5F9FF9769C2E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

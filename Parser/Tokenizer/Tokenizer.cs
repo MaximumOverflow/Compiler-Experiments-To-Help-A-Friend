@@ -83,6 +83,7 @@ public static class Tokenizer
 						Text = keyword,
 						Type = keyword.Span switch
 						{
+							"as" => TokenType.As,
 							"whether" => TokenType.If,
 							"within" => TokenType.In,
 							"whilst" => TokenType.While,

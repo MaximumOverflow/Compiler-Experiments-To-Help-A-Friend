@@ -11,11 +11,11 @@ public sealed partial class CompilationContext : IDisposable
 	public LLVMContextRef LlvmContext;
 	public readonly CompilationSettings CompilationSettings;
 
+	private readonly Dictionary<string, RootNode> _files;
 	private readonly Dictionary<string, LLVMAttributeRef> _attributes;
 	private readonly Dictionary<ReadOnlyMemory<char>, Value> _strings;
 	internal readonly Dictionary<ReadOnlyMemory<char>, Type> DefaultTypes;
 	internal readonly Dictionary<ReadOnlyMemory<char>, Namespace> Namespaces;
-
 
 	public CompilationContext(CompilationSettings compilationSettings)
 	{
@@ -23,7 +23,9 @@ public sealed partial class CompilationContext : IDisposable
 		
 		LlvmContext = LLVMContextRef.Create();
 		LlvmModule = LlvmContext.CreateModuleWithName(compilationSettings.ModuleName);
+		LlvmModule.DataLayout = "e";
 
+		_files = new Dictionary<string, RootNode>();
 		_attributes = new Dictionary<string, LLVMAttributeRef>();
 		_strings = new Dictionary<ReadOnlyMemory<char>, Value>(MemoryStringComparer.Instance);
 		Namespaces = new Dictionary<ReadOnlyMemory<char>, Namespace>(MemoryStringComparer.Instance);
@@ -47,45 +49,97 @@ public sealed partial class CompilationContext : IDisposable
 
 		InitializeReflectionInformation();
 	}
+
+	public RootNode? ParseSourceFile(string path)
+	{
+		if (_files.TryGetValue(path, out var root))
+			return root;
+		
+		var code = File.ReadAllText(path);
+		var tokens = Tokenizer.Tokenize(code);
+		var stream = new TokenStream(CollectionsMarshal.AsSpan(tokens));
+
+		bool result;
+		try
+		{
+			result = RootNode.TryParse(ref stream, out root);
+		}
+		catch (Exception e)
+		{
+			throw new CompilationException($"Failed to parse file '{path}'.", e);
+		}
+
+		if (!result)
+			return null;
+
+		_files.Add(path, root);
+		return root;
+	}
+
+	public void CompileParsedFiles()
+	{
+		var fileCompilationContexts = new List<FileCompilationContext>(_files.Count);
+		foreach (var (path, root) in _files)
+		{
+			if(!Namespaces.TryGetValue(root.Namespace, out var ns))
+				Namespaces.Add(root.Namespace, ns = new Namespace(root.Namespace));
+
+			try
+			{
+				var context = new FileCompilationContext(this, ns, path);
+				context.DeclareSymbols(root.Declarations);
+				fileCompilationContexts.Add(context);
+			}
+			catch (Exception e)
+			{
+				throw new CompilationException($"Failed to compile file '{path}'.", e);
+			}
+		}
+
+		foreach (var context in fileCompilationContexts)
+		{
+			try
+			{
+				context.CompileSymbols();
+			}
+			catch (Exception e)
+			{
+				throw new CompilationException($"Failed to compile file '{context.FilePath}'.", e);
+			}
+		}
+	}
 	
-	public void CompileSourceFile(string source)
+	public void CompileSourceCode(string code)
 	{
 		if (_finalized)
 			throw new InvalidOperationException("Context has already been finalized.");
 
-		RootNode root;
-		var stats = new RuntimeStats();
-		{
-			var tokens = Tokenizer.Tokenize(source);
-			var stream = new TokenStream(CollectionsMarshal.AsSpan(tokens));
+		var tokens = Tokenizer.Tokenize(code);
+		var stream = new TokenStream(CollectionsMarshal.AsSpan(tokens));
+	
+		if (!RootNode.TryParse(ref stream, out var root)) 
+			throw new Exception("Failed to parse root node.");
 		
-			if (!RootNode.TryParse(ref stream, out root)) 
-				throw new Exception("Failed to parse root node.");
-			
-			stats.Dump("Parsing", ConsoleColor.Blue);
-		}
-		
-		stats = new RuntimeStats();
-
 		if(!Namespaces.TryGetValue(root.Namespace, out var @namespace))
 			Namespaces.Add(root.Namespace, @namespace = new Namespace(root.Namespace));
 		
 		var context = new FileCompilationContext(this, @namespace);
-		context.DefineTypes(root.Declarations);
-		context.DefineFunctions(root.Declarations);
-		
-		stats.Dump("IL generation", ConsoleColor.Blue);
+		context.DeclareSymbols(root.Declarations);
+		context.CompileSymbols();
 	}
 
 	public void FinalizeCompilation()
 	{
 		_finalized = true;
 		FinalizeReflectionInformation();
-		LlvmModule.Verify(LLVMVerifierFailureAction.LLVMAbortProcessAction);
+		if (!LlvmModule.TryVerify(LLVMVerifierFailureAction.LLVMPrintMessageAction, out var err))
+		{
+			LlvmModule.Dump();
+			throw new CompilationException(err);
+		}
 		
 		unsafe
 		{
-			var stats = new RuntimeStats();
 			using LLVMPassManagerBuilderRef passManagerBuilder = LLVM.PassManagerBuilderCreate();
 			LLVM.PassManagerBuilderSetOptLevel(passManagerBuilder, CompilationSettings.OptimizationLevel);
 			
@@ -97,13 +151,15 @@ public sealed partial class CompilationContext : IDisposable
 			functionPassManager.InitializeFunctionPassManager();
 			
 			modulePassManager.Run(LlvmModule);
-
+		
 			foreach (var (_, ns) in Namespaces)
 			foreach (var (_, fn) in ns.Functions)
+			{
+				if (fn.External) continue;
 				functionPassManager.RunFunctionPassManager(fn);
-
+			}
+		
 			modulePassManager.Run(LlvmModule);
-			stats.Dump("All optimization passes", ConsoleColor.Blue);
 		}
 	}
 
@@ -121,7 +177,7 @@ public sealed partial class CompilationContext : IDisposable
 		LLVM.SetUnnamedAddress(global, unnamedAddr);
 		global.Initializer = constStr;
 		
-		var i8Ptr = DefaultTypes["i8".AsMemory()].MakePointer();
+		var i8Ptr = DefaultTypes["i8".AsMemory()].MakePointer(true);
 		var llvmValue = LLVMValueRef.CreateConstBitCast(global, i8Ptr);
 		
 		value = new Value(llvmValue, i8Ptr);

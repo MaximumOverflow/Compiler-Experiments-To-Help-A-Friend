@@ -60,13 +60,13 @@ internal static class Expressions
 
 			case ConstantNode {Value: ReadOnlyMemory<char> str}:
 			{
-				return block.Context.GlobalContext.MakeConstString(str);
+				return block.Context.GlobalContext.MakeConstString(str, LLVMUnnamedAddr.LLVMLocalUnnamedAddr);
 			}
 
 			case BlockNode blockNode:
 			{
 				var child = new Block(blockNode, block);
-				var (value, type) = child.Compile(builder, true);
+				var (value, type) = child.Compile(builder, out _);
 				if (type.LlvmType.Kind == LLVMTypeKind.LLVMVoidTypeKind)
 					throw new InvalidOperationException("Block does not return a value.");
 
@@ -79,7 +79,7 @@ internal static class Expressions
 				var obj = builder.BuildAlloca(type);
 				foreach (var (name, valueNode) in node.MemberAssignments)
 				{
-					if (type is not StructType { Members: var members })
+					if (type is not StructType { Fields: var members })
 						return ThrowArgumentException($"Type '{type.Name}' is not a struct.");
 						
 					if (!members.TryGetValue(name, out var member))
@@ -94,14 +94,14 @@ internal static class Expressions
 				}
 
 				return asRef 
-					? new(obj, type.MakePointer()) 
+					? new(obj, type.MakePointer(obj.IsConstant)) 
 					: new(builder.BuildLoad2(type.LlvmType, obj), type);
 			}
 			
 			case NewNode node: unsafe {
 				var type = block.Context.FindType(node.Type);
 
-				if (type is not StructType { Members: var members })
+				if (type is not StructType { Fields: var members })
 					return ThrowArgumentException($"Type '{type.Name}' is not a struct.");
 				
 				LLVMValueRef obj = LLVM.GetUndef(type.LlvmType);
@@ -153,24 +153,24 @@ internal static class Expressions
 					{
 						var variable = builder.BuildAlloca(objType);
 						builder.BuildStore(obj, variable);
-						var field = structType.Members[rightExpr.Name];
+						var field = structType.Fields[rightExpr.Name];
 						var gep = builder.BuildStructGEP2(structType.LlvmType, variable, field.Idx);
-						return new(gep, field.Type.MakePointer());
+						return new(gep, field.Type.MakePointer(gep.IsConstant));
 					}
 
 					case StructType structType:
 					{
-						var field = structType.Members[rightExpr.Name];
+						var field = structType.Fields[rightExpr.Name];
 						return new(builder.BuildExtractValue(obj, field.Idx), field.Type);
 					}
 
 					case PointerType { Base: StructType structType }:
 					{
-						var field = structType.Members[rightExpr.Name];
+						var field = structType.Fields[rightExpr.Name];
 						var gep = builder.BuildStructGEP2(structType.LlvmType, obj, field.Idx);
 						
 						return asRef 
-							? new(gep, field.Type.MakePointer()) 
+							? new(gep, field.Type.MakePointer(gep.IsConstant)) 
 							: new(builder.BuildLoad2(field.Type, gep), field.Type);
 					}
 					
@@ -179,7 +179,7 @@ internal static class Expressions
 				}
 			}
 
-			case BinaryOperationNode { Left: var leftExpr, Right: var rightExpr, Operation: BinaryOperationType.Assign }:
+			case BinaryOperationNode { Left: var leftExpr, Right: IExpressionNode rightExpr, Operation: BinaryOperationType.Assign }:
 			{
 				var (variable, varType) = CompileExpression(block, builder, leftExpr, true);
 				var (value, type) = CompileExpression(block, builder, rightExpr, false);
@@ -252,7 +252,7 @@ internal static class Expressions
 				return new(result, functionType.ReturnType);
 			}
 
-			case BinaryOperationNode { Left: var leftExpr, Right: var rightExpr, Operation: BinaryOperationType.Indexing }:
+			case BinaryOperationNode { Left: var leftExpr, Right: IExpressionNode rightExpr, Operation: BinaryOperationType.Indexing }:
 			{
 				var (array, arrayType) = CompileExpression(block, builder, leftExpr, false);
 				var (index, indexType) = CompileExpression(block, builder, rightExpr, false);
@@ -273,7 +273,27 @@ internal static class Expressions
 					: new(builder.BuildLoad2(ptr.Base, value), ptr.Base);
 			}
 
-			case BinaryOperationNode { Left: var leftExpr, Right: var rightExpr, Operation: var op }:
+			case BinaryOperationNode { Left: var leftExpr, Right: TypeNode rightExpr, Operation: BinaryOperationType.Cast }:
+			{
+				var value = CompileExpression(block, builder, leftExpr, false);
+				var type = block.Context.FindType(rightExpr);
+
+				if (value.Type == type)
+					return value;
+
+				switch (value.Type, type)
+				{
+					case (IntegerType, IntegerType t):
+						return new(builder.BuildIntCast(value.LlvmValue, t), t);
+					
+					case (PointerType, PointerType t):
+						return new(builder.BuildPointerCast(value.LlvmValue, t), t);
+					
+					default: return ThrowArgumentException($"Cannot cast type '{value.Type}' to type '{type}'.");
+				}
+			}
+				
+			case BinaryOperationNode { Left: var leftExpr, Right: IExpressionNode rightExpr, Operation: var op }:
 			{
 				var (leftValue, leftType) = CompileExpression(block, builder, leftExpr, false);
 				var (rightValue, rightType) = CompileExpression(block, builder, rightExpr, false);
@@ -332,6 +352,10 @@ internal static class Expressions
 					case (LLVMTypeKind.LLVMIntegerTypeKind, BinaryOperationType.CmpEq):
 						(leftValue, rightValue) = UniformizeIntegers(leftValue, rightValue, builder);
 						return new(builder.BuildICmp(LLVMIntPredicate.LLVMIntEQ, leftValue, rightValue), block.Context.FindType("maybe"));
+					
+					case (LLVMTypeKind.LLVMIntegerTypeKind, BinaryOperationType.CmpNe):
+						(leftValue, rightValue) = UniformizeIntegers(leftValue, rightValue, builder);
+						return new(builder.BuildICmp(LLVMIntPredicate.LLVMIntNE, leftValue, rightValue), block.Context.FindType("maybe"));
 
 					case (LLVMTypeKind.LLVMDoubleTypeKind or LLVMTypeKind.LLVMFloatTypeKind, BinaryOperationType.Addition):
 						return new(builder.BuildFAdd(leftValue, rightValue), leftType);
@@ -374,20 +398,7 @@ internal static class Expressions
 	}
 
 	private static Value ThrowArgumentException(string message)
-		=> throw new ArgumentException(message);
+		=> throw new CompilationException(message);
 }
 
-internal readonly struct Value
-{
-	public Type Type { get; }
-	public LLVMValueRef LlvmValue { get; }
-
-	public Value(LLVMValueRef llvmValue, Type type)
-	{
-		Type = type;
-		LlvmValue = llvmValue;
-	}
-
-	public void Deconstruct(out LLVMValueRef value, out Type type)
-		=> (value, type) = (LlvmValue, Type);
-}
+internal readonly record struct Value(LLVMValueRef LlvmValue, Type Type);

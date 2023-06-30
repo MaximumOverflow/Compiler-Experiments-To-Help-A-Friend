@@ -43,6 +43,7 @@ public enum TokenType
 	CloseSquare,
 
 	AssignmentSeparator,
+	As,
 	Set,
 	Comma,
 	Semicolon,

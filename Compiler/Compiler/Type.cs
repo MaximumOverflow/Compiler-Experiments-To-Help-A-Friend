@@ -1,4 +1,6 @@
-﻿namespace Squyrm.Compiler;
+﻿using System.Collections.Immutable;
+
+namespace Squyrm.Compiler;
 
 public abstract class Type : IEquatable<Type>
 {
@@ -23,7 +25,7 @@ public abstract class Type : IEquatable<Type>
 		MetadataTableOffset = context.RegisterTypeForReflection(this);
 	}
 
-	public PointerType MakePointer(bool @const = false)
+	public PointerType MakePointer(bool @const)
 	{
 		if (@const)
 		{
@@ -53,6 +55,8 @@ public abstract class Type : IEquatable<Type>
 	public virtual bool Equals(Type? other)
 	{
 		if (ReferenceEquals(null, other)) return false;
+		if (other is PointerType) return other.Equals(this);
+		if (other is FunctionType) return other.Equals(this);
 		return LlvmType == other.LlvmType;
 	}
 	
@@ -160,10 +164,23 @@ public sealed class PointerType : Type
 public sealed class StructType : Type
 {
 	public override ReadOnlyMemory<char> Name { get; }
-	public required IReadOnlyDictionary<ReadOnlyMemory<char>, TypeMember> Members { get; init; }
+	public IReadOnlyDictionary<ReadOnlyMemory<char>, TypeMember> Fields { get; private set; }
 
-	public StructType(CompilationContext context, ReadOnlyMemory<char> name, LLVMTypeRef llvmType)
-		: base(context, llvmType) => Name = name;
+	private StructType(
+		CompilationContext context,
+		ReadOnlyMemory<char> name,
+		LLVMTypeRef llvmType, 
+		IReadOnlyDictionary<ReadOnlyMemory<char>, TypeMember> fields) : base(context, llvmType)
+	{
+		Name = name;
+		Fields = fields;
+	}
+	
+	internal static StructType Create(CompilationContext context, ReadOnlyMemory<char> name)
+	{
+		var llvmType = context.LlvmContext.CreateNamedStruct(name.Span);
+		return new StructType(context, name, llvmType, ImmutableDictionary<ReadOnlyMemory<char>, TypeMember>.Empty);
+	}
 
 	internal static StructType Create(
 		CompilationContext context, 
@@ -172,6 +189,19 @@ public sealed class StructType : Type
 	)
 	{
 		var llvmType = context.LlvmContext.CreateNamedStruct(name.Span);
+		var type = new StructType(
+			context, name, llvmType, 
+			ImmutableDictionary<ReadOnlyMemory<char>, TypeMember>.Empty
+		);
+		
+		if(members.Count != 0)
+			type.SetBody(members);
+
+		return type;
+	}
+
+	internal void SetBody(IReadOnlyList<(ReadOnlyMemory<char>, Type)> members)
+	{
 		Span<LLVMTypeRef> memberTypes = stackalloc LLVMTypeRef[members.Count];
 		var memberDictionary = new Dictionary<ReadOnlyMemory<char>, TypeMember>(MemoryStringComparer.Instance);
 		for (var i = 0; i < members.Count; i++)
@@ -180,9 +210,9 @@ public sealed class StructType : Type
 			memberTypes[i] = memberType.LlvmType;
 			memberDictionary.Add(memberName, new TypeMember { Idx = (uint) i, Name = memberName, Type = memberType });
 		}
-		
-		llvmType.StructSetBody(memberTypes, false);
-		return new StructType(context, name, llvmType) { Members = memberDictionary };
+
+		Fields = memberDictionary;
+		LlvmType.StructSetBody(memberTypes, false);
 	}
 }
 

@@ -4,9 +4,9 @@ public sealed class BinaryOperationNode : IExpressionNode, IParseableNode<Binary
 {
 	public BinaryOperationType Operation { get; }
 	public IExpressionNode Left { get; }
-	public IExpressionNode Right { get; }
+	public IAstNode Right { get; }
 
-	internal BinaryOperationNode(IExpressionNode left, IExpressionNode right, BinaryOperationType operation)
+	internal BinaryOperationNode(IExpressionNode left, IAstNode right, BinaryOperationType operation)
 	{
 		Left = left;
 		Right = right;
@@ -43,20 +43,23 @@ public sealed class BinaryOperationNode : IExpressionNode, IParseableNode<Binary
 			{ Type: TokenType.OpenRound } => BinaryOperationType.Call,
 			{ Type: TokenType.OpenSquare } => BinaryOperationType.Indexing,
 			{ Type: TokenType.AssignmentSeparator } => BinaryOperationType.Assign,
+			{ Type: TokenType.As } => BinaryOperationType.Cast,
 			_ => null,
 		};
 
 		if (op is not {} operation)
 			return false;
 
-		IExpressionNode right;
+		IAstNode right;
 		switch (operation)
 		{
+			//TODO fix access after call		func(param).data
 			case BinaryOperationType.Call:
 			{
 				tokens.Position--;
 				if (!TupleNode.TryParse(ref tokens, out var tuple))
 					return UnexpectedTokenException.Throw<bool>(tokens.Current);
+				
 				right = tuple;
 				break;
 			}
@@ -65,16 +68,27 @@ public sealed class BinaryOperationNode : IExpressionNode, IParseableNode<Binary
 			{
 				if (!IExpressionNode.TryParse(ref tokens, false, out var index))
 					return UnexpectedTokenException.Throw<bool>(tokens.Current);
+				
 				tokens.ExpectToken(TokenType.CloseSquare);
 				right = index;
 				break;
 			}
 
+			case BinaryOperationType.Cast:
+			{
+				if (!TypeNode.TryParse(ref tokens, out var type))
+					return UnexpectedTokenException.Throw<bool>(tokens.Current);
+
+				right = type;
+				break;
+			}
+
 			default:
 			{
-				if (!IExpressionNode.TryParse(ref tokens, false, out right))
+				if (!IExpressionNode.TryParse(ref tokens, false, out var parsedRight))
 					return UnexpectedTokenException.Throw<bool>(tokens.Current);
-				
+
+				right = parsedRight;
 				if (right is BinaryOperationNode bin && GetPriority(operation) >= GetPriority(bin.Operation))
 				{
 					right = bin.Right;
@@ -126,5 +140,6 @@ public enum BinaryOperationType
 	CmpLt,
 	CmpGe,
 	CmpLe,
-	Assign
+	Assign,
+	Cast,
 }

@@ -5,6 +5,7 @@ internal sealed class Block
 	private readonly Block? _parent;
 	private readonly BlockNode _node;
 	private readonly Function _function;
+	public readonly LLVMBasicBlockRef EntryBlock;
 	public readonly FileCompilationContext Context;
 	private readonly Dictionary<ReadOnlyMemory<char>, Variable> _variables;
 
@@ -17,6 +18,7 @@ internal sealed class Block
 		Context = context;
 		_function = function;
 		_variables = new(MemoryStringComparer.Instance);
+		EntryBlock = context.GlobalContext.LlvmContext.AppendBasicBlock(function, "");
 	}
 	
 	public Block(BlockNode node, Block parent)
@@ -26,19 +28,13 @@ internal sealed class Block
 		Context = parent.Context;
 		_function = parent._function;
 		_variables = new(parent._variables, MemoryStringComparer.Instance);
+		EntryBlock = parent.LlvmContext.AppendBasicBlock(parent.EntryBlock.Parent, "");
 	}
-	
-	public Value Compile(LLVMBuilderRef builder, bool connectToParent)
-		=> Compile(builder, connectToParent, out _, out _);
 
-	public Value Compile(LLVMBuilderRef builder, bool connectToParent, out bool hasReturned)
-		=> Compile(builder, connectToParent, out _, out hasReturned);
-	
-	public Value Compile(LLVMBuilderRef builder, bool connectToParent, out LLVMBasicBlockRef llvmBlock, out bool hasReturned)
+	public Value Compile(LLVMBuilderRef builder, out bool hasReturned)
 	{
 		var parentBlock = builder.InsertBlock;
-		llvmBlock = LlvmContext.AppendBasicBlock(_function, "");
-		builder.PositionAtEnd(llvmBlock);
+		builder.PositionAtEnd(EntryBlock);
 
 		if (_variables.Count == 0)
 		{
@@ -57,34 +53,6 @@ internal sealed class Block
 		foreach (var statement in _node.StatementNodes)
 			blockRet = CompileStatement(statement, builder, ref hasReturned);
 
-		if (_parent is not null)
-		{
-			if (llvmBlock.FirstInstruction == default)
-			{
-				llvmBlock.RemoveFromParent();
-				builder.PositionAtEnd(parentBlock);
-			}
-			else if (connectToParent)
-			{
-				// Connect the two blocks
-				builder.PositionAtEnd(parentBlock);
-				builder.BuildBr(llvmBlock);
-					
-				// Continue execution
-				builder.PositionAtEnd(llvmBlock);
-				llvmBlock = LlvmContext.AppendBasicBlock(_function, "");
-				builder.BuildBr(llvmBlock);
-				builder.PositionAtEnd(llvmBlock);
-			}
-		}
-		else if (
-			_function.Type.ReturnType.LlvmType.Kind == LLVMTypeKind.LLVMVoidTypeKind && 
-			builder.InsertBlock.Terminator == default
-		)
-		{
-			builder.BuildRetVoid();
-		}
-
 		return blockRet;
 	}
 
@@ -98,7 +66,8 @@ internal sealed class Block
 			case BlockNode blockNode:
 			{
 				var block = new Block(blockNode, this);
-				return block.Compile(builder, true, out hasReturned);
+				builder.BuildBr(block);
+				return block.Compile(builder, out hasReturned);
 			}
 
 			case IExpressionNode expr:
@@ -148,44 +117,25 @@ internal sealed class Block
 				var (condition, type) = Expressions.CompileExpression(this, builder, expr, false);
 				if (type != Context.FindType("maybe")) 
 					throw new ArgumentException($"Expected value of type 'maybe', found {type}.");
-					
-				var checkBlock = builder.InsertBlock;
+
+				var then = new Block(thenExpr, this);
+				var @else = LlvmContext.AppendBasicBlock(_function, "");
 				var @continue = LlvmContext.AppendBasicBlock(_function, "");
+				builder.BuildCondBr(condition, then, @else);
 
-				// Then
-				Value thenRet;
-				LLVMBasicBlockRef thenBlock;
+				// TODO Handle if both cases have returned
+				then.Compile(builder, out _);
+				builder.BuildBr(@continue);
+
+				builder.PositionAtEnd(@else);
+				if (elseStatement is not null)
 				{
-					var then = new Block(thenExpr, this);
-					thenRet = then.Compile(builder, false, out thenBlock, out _);
-					builder.BuildBr(@continue);
-					builder.PositionAtEnd(@continue);
-				}
-					
-				// Else
-				Value elseRet;
-				LLVMBasicBlockRef elseBlock;
-				{
-					elseBlock = LlvmContext.AppendBasicBlock(_function, "");
-					builder.PositionAtEnd(elseBlock);
-					if (elseStatement != null)
-					{
-						var dummy = hasReturned;
-						elseRet = CompileStatement(elseStatement, builder, ref dummy);
-					}
-					
-					builder.BuildBr(@continue);
-					builder.PositionAtEnd(@continue);
+					var dummy = false;
+					CompileStatement(elseStatement, builder, ref dummy);
 				}
 
-				// Check
-				{
-					var current = builder.InsertBlock;
-					builder.PositionAtEnd(checkBlock);
-					builder.BuildCondBr(condition, thenBlock, elseBlock);
-					builder.PositionAtEnd(current);
-				}
-
+				builder.BuildBr(@continue);
+				builder.PositionAtEnd(@continue);
 				break;
 			}
 
@@ -196,12 +146,9 @@ internal sealed class Block
 				var @continue = LlvmContext.AppendBasicBlock(_function, "");
 					
 				// Execute
-				LLVMBasicBlockRef execute;
-				{
-					var block = new Block(blockNode, this);
-					block.Compile(builder, false, out execute, out _);
-					builder.BuildBr(check);
-				}
+				var execute = new Block(blockNode, this);
+				execute.Compile(builder, out _);
+				builder.BuildBr(check);
 
 				// Check
 				{
@@ -225,6 +172,9 @@ internal sealed class Block
 		
 		return new(default, Context.FindType("nothing"));
 	}
+
+	public static implicit operator LLVMBasicBlockRef(Block block) 
+		=> block.EntryBlock;
 }
 
 internal readonly struct Variable

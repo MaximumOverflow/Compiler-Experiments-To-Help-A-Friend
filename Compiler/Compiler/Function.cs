@@ -2,6 +2,7 @@
 
 public sealed class Function
 {
+	public bool External { get; private set; }
 	public bool Public { get; }
 	public FunctionType Type { get; }
 	public LLVMValueRef LlvmValue { get; }
@@ -16,6 +17,7 @@ public sealed class Function
 	{
 		Type = type;
 		Name = name;
+		External = true;
 		Public = @public;
 		ParameterNames = parameterNames;
 		LlvmValue = context.LlvmModule.AddFunction(name.Span, type);
@@ -27,7 +29,7 @@ public sealed class Function
 		using var builder = context.GlobalContext.LlvmContext.CreateBuilder();
 		var block = new Block(body, function, context);
 		
-		var (value, type) = block.Compile(builder, true, out var hasReturned);
+		var (value, type) = block.Compile(builder, out var hasReturned);
 		if (!hasReturned && type.LlvmType != LLVMTypeRef.Void)
 		{
 			var retT = function.Type.ReturnType;
@@ -37,6 +39,8 @@ public sealed class Function
 			
 			builder.BuildRet(value);
 		}
+
+		function.External = false;
 	}
 
 	internal static unsafe void ClearBody(LLVMValueRef function)
