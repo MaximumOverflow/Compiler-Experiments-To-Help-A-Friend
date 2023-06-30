@@ -1,11 +1,13 @@
-﻿using LanguageParser.Tokenizer;
-using LanguageParser.Parser;
+﻿namespace Squyrm.Parser.AST;
 
-namespace LanguageParser.AST;
-
-internal sealed class VariableNode : IExpressionNode, IParseableNode<VariableNode>
+public sealed class VariableNode : IExpressionNode, IParseableNode<VariableNode>
 {
-	public required ReadOnlyMemory<char> Name { get; init; }
+	public ReadOnlyMemory<char> Name { get; }
+
+	internal VariableNode(ReadOnlyMemory<char> name)
+	{
+		Name = name;
+	}
 
 	public static bool TryParse(ref TokenStream stream, out VariableNode result)
 	{
@@ -16,7 +18,7 @@ internal sealed class VariableNode : IExpressionNode, IParseableNode<VariableNod
 			return false;
 
 		stream = tokens;
-		result = new VariableNode { Name = token.Text };
+		result = new VariableNode(token.Text);
 		return true;
 	}
 }

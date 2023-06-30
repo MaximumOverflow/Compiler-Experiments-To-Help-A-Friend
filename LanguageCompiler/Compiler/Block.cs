@@ -1,7 +1,4 @@
-﻿using LanguageParser.AST;
-using LLVMSharp.Interop;
-
-namespace LanguageParser.Compiler;
+﻿namespace Squyrm.Compiler;
 
 internal sealed class Block
 {

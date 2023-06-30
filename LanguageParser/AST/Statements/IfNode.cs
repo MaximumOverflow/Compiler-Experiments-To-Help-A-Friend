@@ -1,14 +1,18 @@
-﻿using LanguageParser.Tokenizer;
-using LanguageParser.Parser;
+﻿namespace Squyrm.Parser.AST;
 
-namespace LanguageParser.AST;
-
-internal sealed class IfNode:  IStatementNode, IParseableNode<IfNode>
+public sealed class IfNode:  IStatementNode, IParseableNode<IfNode>
 {
 	public bool RequiresSemicolon => false;
-	public required IExpressionNode Condition { get; init; }
-	public required BlockNode Then { get; init; }
-	public required IStatementNode? Else { get; init; }
+	public IExpressionNode Condition { get; }
+	public BlockNode Then { get; }
+	public IStatementNode? Else { get; }
+
+	internal IfNode(IExpressionNode condition, BlockNode then, IStatementNode? @else)
+	{
+		Condition = condition;
+		Then = then;
+		Else = @else;
+	}
 
 	public static bool TryParse(ref TokenStream stream, out IfNode result)
 	{
@@ -35,13 +39,7 @@ internal sealed class IfNode:  IStatementNode, IParseableNode<IfNode>
 		}
 
 		stream = tokens;
-		result = new IfNode
-		{
-			Condition = condition,
-			Then = block,
-			Else = @else,
-		};
-
+		result = new IfNode(condition, block, @else);
 		return true;
 	}
 }

@@ -1,4 +1,4 @@
-﻿namespace LanguageParser.Compiler;
+﻿namespace Squyrm.Compiler;
 
 public sealed class Namespace
 {

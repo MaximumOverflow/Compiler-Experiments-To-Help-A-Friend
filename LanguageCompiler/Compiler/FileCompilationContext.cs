@@ -1,7 +1,4 @@
-﻿using LanguageParser.AST;
-using LLVMSharp.Interop;
-
-namespace LanguageParser.Compiler;
+﻿namespace Squyrm.Compiler;
 
 internal sealed class FileCompilationContext
 {
@@ -71,12 +68,11 @@ internal sealed class FileCompilationContext
 					var parameterTypes = function.Parameters.Select(p => FindType(p.Type)).ToArray();
 					var functionType = new FunctionType(returnType, parameterTypes, function.Variadic);
 					
-					Namespace.Functions.Add(function.Name, new Function
-					{
-						ParameterNames = parameterNames,
-						Name = function.Name, Public = function.Public, Type = functionType,
-						LlvmValue = GlobalContext.LlvmModule.AddFunction(function.Name.Span, functionType),
-					});
+					Namespace.Functions.Add(
+						function.Name, 
+						new Function(GlobalContext, function.Name, function.Public, functionType, parameterNames)
+					);
+
 					break;
 				}
 			}

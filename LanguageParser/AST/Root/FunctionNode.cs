@@ -1,17 +1,24 @@
-﻿using LanguageParser.Tokenizer;
-using LanguageParser.Parser;
+﻿namespace Squyrm.Parser.AST;
 
-namespace LanguageParser.AST;
-
-internal sealed class FunctionNode : IRootDeclarationNode, IParseableNode<FunctionNode>
+public sealed class FunctionNode : IRootDeclarationNode, IParseableNode<FunctionNode>
 {
-	public required bool Public { get; init; }
-	public required bool Variadic { get; init; }
-	public required ReadOnlyMemory<char> Name { get; init; }
-	public required TypeNode ReturnType { get; init; }
-	public required IReadOnlyList<ParameterNode> Parameters { get; init; }
-	public required BlockNode? Block { get; init; }
-	
+	public bool Public { get; }
+	public bool Variadic { get; }
+	public ReadOnlyMemory<char> Name { get; }
+	public TypeNode ReturnType { get; }
+	public IReadOnlyList<ParameterNode> Parameters { get; }
+	public BlockNode? Block { get; }
+
+	internal FunctionNode(bool @public, bool variadic, ReadOnlyMemory<char> name, TypeNode returnType, IReadOnlyList<ParameterNode> parameters, BlockNode? block)
+	{
+		Public = @public;
+		Variadic = variadic;
+		Name = name;
+		ReturnType = returnType;
+		Parameters = parameters;
+		Block = block;
+	}
+
 	public static bool TryParse(ref TokenStream stream, out FunctionNode result)
 	{
 		result = default!;
@@ -53,25 +60,22 @@ internal sealed class FunctionNode : IRootDeclarationNode, IParseableNode<Functi
 			return false;
 
 		stream = tokens;
-		result = new FunctionNode
-		{
-			Public = @public,
-			Name = name,
-			Block = block,
-			Parameters = args,
-			Variadic = variadic,
-			ReturnType = returnType,
-		};
-		
+		result = new FunctionNode(@public, variadic, name, returnType, args, block);
 		return true;
 	}
 }
 
-internal sealed class ParameterNode : IParseableNode<ParameterNode>, IParseableNode<(IReadOnlyList<ParameterNode>, bool)>
+public sealed class ParameterNode : IParseableNode<ParameterNode>, IParseableNode<(IReadOnlyList<ParameterNode>, bool)>
 {
-	public required ReadOnlyMemory<char> Name { get; init;  }
-	public required TypeNode Type { get; init;  }
-	
+	public ReadOnlyMemory<char> Name { get; }
+	public TypeNode Type { get; }
+
+	internal ParameterNode(ReadOnlyMemory<char> name, TypeNode type)
+	{
+		Name = name;
+		Type = type;
+	}
+
 	public static bool TryParse(ref TokenStream stream, out ParameterNode result)
 	{
 		result = default!;
@@ -84,7 +88,7 @@ internal sealed class ParameterNode : IParseableNode<ParameterNode>, IParseableN
 			return false;
 		
 		stream = tokens;
-		result = new ParameterNode { Name = name, Type = type };
+		result = new ParameterNode(name, type);
 		return true;
 	}
 

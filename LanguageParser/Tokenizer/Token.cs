@@ -1,6 +1,6 @@
 ﻿using System.Runtime.InteropServices;
 
-namespace LanguageParser.Tokenizer;
+namespace Squyrm.Parser;
 
 public readonly struct Token
 {
@@ -73,7 +73,6 @@ public enum TokenType
 	Public,
 	Private,
 	External,
-	Void,
 	Return,
 	Nix,
 	True,

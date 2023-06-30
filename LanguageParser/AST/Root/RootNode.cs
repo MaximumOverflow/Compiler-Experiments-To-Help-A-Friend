@@ -1,12 +1,17 @@
-﻿using LanguageParser.Parser;
+﻿namespace Squyrm.Parser.AST;
 
-namespace LanguageParser.AST;
-
-internal sealed class RootNode : IParseableNode<RootNode>
+public sealed class RootNode : IParseableNode<RootNode>
 {
-	public required ReadOnlyMemory<char> Namespace { get; init; }
-	public required IReadOnlyList<ImportNode> Imports { get; init; }
-	public required IReadOnlyList<IRootDeclarationNode> Declarations { get; init; }
+	public ReadOnlyMemory<char> Namespace { get; }
+	public IReadOnlyList<ImportNode> Imports { get; }
+	public IReadOnlyList<IRootDeclarationNode> Declarations { get; }
+
+	internal RootNode(ReadOnlyMemory<char> ns, IReadOnlyList<ImportNode> imports, IReadOnlyList<IRootDeclarationNode> declarations)
+	{
+		Namespace = ns;
+		Imports = imports;
+		Declarations = declarations;
+	}
 
 	public static bool TryParse(ref TokenStream stream, out RootNode result)
 	{
@@ -36,12 +41,7 @@ internal sealed class RootNode : IParseableNode<RootNode>
 		}
 
 		stream = tokens;
-		result = new RootNode
-		{
-			Namespace = @namespace,
-			Imports = imports,
-			Declarations = declarations,
-		};
+		result = new RootNode(@namespace, imports, declarations);
 		return true;
 	}
 }

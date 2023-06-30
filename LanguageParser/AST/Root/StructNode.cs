@@ -1,14 +1,18 @@
-﻿using LanguageParser.Parser;
-using LanguageParser.Tokenizer;
+﻿namespace Squyrm.Parser.AST;
 
-namespace LanguageParser.AST;
-
-internal sealed class StructNode : IRootDeclarationNode, IParseableNode<StructNode>
+public sealed class StructNode : IRootDeclarationNode, IParseableNode<StructNode>
 {
-	public required bool Public { get; init; }
-	public required ReadOnlyMemory<char> Name { get; init; }
-	public required IReadOnlyList<ClassMemberNode> Members { get; init; }
-	
+	public bool Public { get; }
+	public ReadOnlyMemory<char> Name { get; }
+	public IReadOnlyList<ClassMemberNode> Members { get; }
+
+	internal StructNode(bool @public, ReadOnlyMemory<char> name, IReadOnlyList<ClassMemberNode> members)
+	{
+		Public = @public;
+		Name = name;
+		Members = members;
+	}
+
 	public static bool TryParse(ref TokenStream stream, out StructNode result)
 	{
 		result = default!;
@@ -41,23 +45,26 @@ internal sealed class StructNode : IRootDeclarationNode, IParseableNode<StructNo
 		tokens.ExpectToken(TokenType.CloseCurly);
 		
 		stream = tokens;
-		result = new StructNode
-		{
-			Name = name,
-			Public = @public,
-			Members = members,
-		};
+		result = new StructNode(@public, name, members);
 		return true;
 	}
 }
 
-internal sealed class ClassMemberNode : IParseableNode<ClassMemberNode>
+public sealed class ClassMemberNode : IParseableNode<ClassMemberNode>
 {
-	public required bool Public { get; init; }
-	public required bool Const { get; init; }
-	public required ReadOnlyMemory<char> Name { get; init; }
-	public required TypeNode Type { get; init; }
-	
+	public bool Public { get; }
+	public bool Const { get; }
+	public ReadOnlyMemory<char> Name { get; }
+	public TypeNode Type { get; }
+
+	internal ClassMemberNode(bool @public, bool @const, ReadOnlyMemory<char> name, TypeNode type)
+	{
+		Public = @public;
+		Const = @const;
+		Name = name;
+		Type = type;
+	}
+
 	public static bool TryParse(ref TokenStream stream, out ClassMemberNode result)
 	{
 		result = default!;
@@ -88,14 +95,7 @@ internal sealed class ClassMemberNode : IParseableNode<ClassMemberNode>
 			return false;
 
 		stream = tokens;
-		result = new ClassMemberNode
-		{
-			Const = @const,
-			Name = name,
-			Public = @public,
-			Type = type,
-		};
-		
+		result = new ClassMemberNode(@public, @const, name, type);
 		return true;
 	}
 }

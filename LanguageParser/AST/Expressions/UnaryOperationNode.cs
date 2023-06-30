@@ -1,12 +1,15 @@
-﻿using LanguageParser.Parser;
-using LanguageParser.Tokenizer;
+﻿namespace Squyrm.Parser.AST;
 
-namespace LanguageParser.AST;
-
-internal sealed class UnaryOperationNode : IExpressionNode, IParseableNode<UnaryOperationNode>
+public sealed class UnaryOperationNode : IExpressionNode, IParseableNode<UnaryOperationNode>
 {
-	public required IAstNode Expression { get; init; }
-	public required UnaryOperationType Operation { get; init; }
+	public IAstNode Expression { get; }
+	public UnaryOperationType Operation { get; }
+
+	internal UnaryOperationNode(IAstNode expression, UnaryOperationType operation)
+	{
+		Expression = expression;
+		Operation = operation;
+	}
 
 	public static bool TryParse(ref TokenStream stream, out UnaryOperationNode result)
 	{
@@ -23,11 +26,7 @@ internal sealed class UnaryOperationNode : IExpressionNode, IParseableNode<Unary
 				if (tokens.MoveNext() is not {Type: TokenType.CloseRound})
 					return false;
 
-				result = new UnaryOperationNode
-				{
-					Expression = value, 
-					Operation = UnaryOperationType.Group,
-				};
+				result = new UnaryOperationNode(value, UnaryOperationType.Group);
 				break;
 			}
 
@@ -36,11 +35,7 @@ internal sealed class UnaryOperationNode : IExpressionNode, IParseableNode<Unary
 				if (!IExpressionNode.TryParse(ref tokens, false, out var value))
 					return UnexpectedTokenException.Throw<bool>(tokens.Current);
 
-				result = new UnaryOperationNode
-				{
-					Expression = value, 
-					Operation = UnaryOperationType.Negate,
-				};
+				result = new UnaryOperationNode(value, UnaryOperationType.Negate);
 				break;
 			}
 			
@@ -49,11 +44,7 @@ internal sealed class UnaryOperationNode : IExpressionNode, IParseableNode<Unary
 				if (!IExpressionNode.TryParse(ref tokens, false, out var value))
 					return UnexpectedTokenException.Throw<bool>(tokens.Current);
 
-				result = new UnaryOperationNode
-				{
-					Expression = value, 
-					Operation = UnaryOperationType.AddrOf,
-				};
+				result = new UnaryOperationNode(value, UnaryOperationType.AddrOf);
 				break;
 			}
 			
@@ -62,11 +53,7 @@ internal sealed class UnaryOperationNode : IExpressionNode, IParseableNode<Unary
 				if (!IExpressionNode.TryParse(ref tokens, false, out var value))
 					return UnexpectedTokenException.Throw<bool>(tokens.Current);
 
-				result = new UnaryOperationNode
-				{
-					Expression = value, 
-					Operation = UnaryOperationType.ValueOf,
-				};
+				result = new UnaryOperationNode(value, UnaryOperationType.ValueOf);
 				break;
 			}
 
@@ -79,11 +66,7 @@ internal sealed class UnaryOperationNode : IExpressionNode, IParseableNode<Unary
 
 				tokens.ExpectToken(TokenType.CloseRound);
 				
-				result = new UnaryOperationNode
-				{
-					Expression = type, 
-					Operation = UnaryOperationType.TypeId,
-				};
+				result = new UnaryOperationNode(type, UnaryOperationType.TypeId);
 				break;
 			}
 
@@ -92,11 +75,7 @@ internal sealed class UnaryOperationNode : IExpressionNode, IParseableNode<Unary
 				if (!TypeNode.TryParse(ref tokens, out var type))
 					return UnexpectedTokenException.Throw<bool>(tokens.Current);
 				
-				result = new UnaryOperationNode
-				{
-					Expression = type, 
-					Operation = UnaryOperationType.Undefined,
-				};
+				result = new UnaryOperationNode(type, UnaryOperationType.Undefined);
 				break;
 			}
 				

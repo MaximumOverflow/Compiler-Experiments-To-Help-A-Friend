@@ -1,6 +1,4 @@
-﻿using LLVMSharp.Interop;
-
-namespace LanguageParser.Compiler;
+﻿namespace Squyrm.Compiler;
 
 public abstract class Type : IEquatable<Type>
 {
@@ -80,7 +78,7 @@ public abstract class Type : IEquatable<Type>
 	}
 }
 
-public sealed class IntrinsicType : Type
+public class IntrinsicType : Type
 {
 	public override bool Public => false;
 	public override ReadOnlyMemory<char> Name { get; }
@@ -88,13 +86,27 @@ public sealed class IntrinsicType : Type
 	public IntrinsicType(CompilationContext context, string name, LLVMTypeRef llvmType) 
 		: this(context, name.AsMemory(), llvmType) {}
 
-	public IntrinsicType(
-		CompilationContext context, 
-		ReadOnlyMemory<char> name, 
-		LLVMTypeRef llvmType
-	) : base(context, llvmType)
+	protected IntrinsicType(CompilationContext context, ReadOnlyMemory<char> name, LLVMTypeRef llvmType) : base(context, llvmType)
 	{
 		Name = name;
+	}
+}
+
+public sealed class IntegerType : IntrinsicType
+{
+	public uint Bits { get; }
+	public bool Unsigned { get; }
+	
+	public IntegerType(CompilationContext context, uint bits, bool unsigned) 
+		: base(context, MakeName(bits, unsigned), context.LlvmContext.GetIntType(bits))
+	{
+		Bits = bits;
+		Unsigned = unsigned;
+	}
+
+	private static ReadOnlyMemory<char> MakeName(uint bits, bool unsigned)
+	{
+		return $"{(unsigned ? 'u' : 'i')}{bits}".AsMemory();
 	}
 }
 

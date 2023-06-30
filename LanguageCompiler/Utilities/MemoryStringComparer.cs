@@ -1,4 +1,4 @@
-﻿namespace LanguageParser;
+﻿namespace Squyrm.Utilities;
 
 public sealed class MemoryStringComparer : IEqualityComparer<ReadOnlyMemory<char>>
 {

@@ -1,6 +1,4 @@
-﻿using LLVMSharp.Interop;
-
-namespace LanguageParser.Compiler;
+﻿namespace Squyrm.Compiler;
 
 public sealed partial class CompilationContext : IDisposable
 {
@@ -99,6 +97,8 @@ public sealed partial class CompilationContext : IDisposable
 	private void FinalizeReflectionInformation()
 	{
 		if (!CompilationSettings.EmitReflectionInformation) return;
+		var stats = new RuntimeStats();
+
 		var i8Ptr = DefaultTypes["i8".AsMemory()].MakePointer();
 		var tablesT = (StructType) DefaultTypes["__MetadataTables__".AsMemory()];
 		var tableRefValues = new LLVMValueRef[tablesT.Members.Count];
@@ -151,6 +151,7 @@ public sealed partial class CompilationContext : IDisposable
 
 		var tablesGlobal = LlvmModule.GetNamedGlobal("__MetadataTables__");
 		tablesGlobal.Initializer = LLVMValueRef.CreateConstNamedStruct(tablesT, tableRefValues);
+		stats.Dump("Reflection metadata generation", ConsoleColor.Blue);
 	}
 
 	private StructType MakeMetadataTableRef(Type elementType)

@@ -1,13 +1,14 @@
-﻿using System.Runtime.InteropServices;
-using LanguageParser.Tokenizer;
-using LanguageParser.Parser;
+﻿namespace Squyrm.Parser.AST;
 
-namespace LanguageParser.AST;
-
-internal sealed class ImportNode : IParseableNode<ImportNode>
+public sealed class ImportNode : IParseableNode<ImportNode>
 {
-	public required ReadOnlyMemory<char> Namespace { get; init; }
-	
+	public ReadOnlyMemory<char> Namespace { get; }
+
+	internal ImportNode(ReadOnlyMemory<char> ns)
+	{
+		Namespace = ns;
+	}
+
 	public static bool TryParse(ref TokenStream stream, out ImportNode result)
 	{
 		result = default!;
@@ -20,7 +21,7 @@ internal sealed class ImportNode : IParseableNode<ImportNode>
 			return UnexpectedTokenException.Throw<bool>(tokens.Current);
 
 		stream = tokens;
-		result = new ImportNode { Namespace = @namespace };
+		result = new ImportNode(@namespace);
 		return true;
 	}
 

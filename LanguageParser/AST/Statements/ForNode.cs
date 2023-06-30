@@ -1,15 +1,19 @@
-﻿using LanguageParser.Tokenizer;
-using LanguageParser.Parser;
+﻿namespace Squyrm.Parser.AST;
 
-namespace LanguageParser.AST;
-
-internal sealed class ForNode:  IStatementNode, IParseableNode<ForNode>
+public sealed class ForNode:  IStatementNode, IParseableNode<ForNode>
 {
 	public bool RequiresSemicolon => false;
-	public required ReadOnlyMemory<char> Var { get; init; }
-	public required IExpressionNode Enumerable { get; init; }
-	public required BlockNode Block { get; init; }
-	
+	public ReadOnlyMemory<char> Var { get; }
+	public IExpressionNode Enumerable { get; }
+	public BlockNode Block { get; }
+
+	internal ForNode(ReadOnlyMemory<char> var, IExpressionNode enumerable, BlockNode block)
+	{
+		Var = var;
+		Enumerable = enumerable;
+		Block = block;
+	}
+
 	public static bool TryParse(ref TokenStream stream, out ForNode result)
 	{
 		result = default!;
@@ -31,13 +35,7 @@ internal sealed class ForNode:  IStatementNode, IParseableNode<ForNode>
 			return false;
 
 		stream = tokens;
-		result = new ForNode
-		{
-			Var = name,
-			Enumerable = enumerable,
-			Block = block,
-		};
-
+		result = new ForNode(name, enumerable, block);
 		return true;
 	}
 }

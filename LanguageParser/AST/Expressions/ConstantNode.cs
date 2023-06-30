@@ -1,15 +1,10 @@
-﻿using LanguageParser.Tokenizer;
-using System.CodeDom.Compiler;
-using LanguageParser.Parser;
-using System.Numerics;
+﻿namespace Squyrm.Parser.AST;
 
-namespace LanguageParser.AST;
-
-internal sealed class ConstantNode : IExpressionNode, IParseableNode<ConstantNode>
+public sealed class ConstantNode : IExpressionNode, IParseableNode<ConstantNode>
 {
 	public object Value { get; }
 
-	public ConstantNode(object value)
+	internal ConstantNode(object value)
 	{
 		Value = value;
 	}

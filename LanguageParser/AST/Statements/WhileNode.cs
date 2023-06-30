@@ -1,14 +1,17 @@
-﻿using LanguageParser.Tokenizer;
-using LanguageParser.Parser;
+﻿namespace Squyrm.Parser.AST;
 
-namespace LanguageParser.AST;
-
-internal sealed class WhileNode:  IStatementNode, IParseableNode<WhileNode>
+public sealed class WhileNode:  IStatementNode, IParseableNode<WhileNode>
 {
 	public bool RequiresSemicolon => false;
-	public required IExpressionNode Condition { get; init; }
-	public required BlockNode Block { get; init; }
-	
+	public IExpressionNode Condition { get; }
+	public BlockNode Block { get; }
+
+	internal WhileNode(IExpressionNode condition, BlockNode block)
+	{
+		Condition = condition;
+		Block = block;
+	}
+
 	public static bool TryParse(ref TokenStream stream, out WhileNode result)
 	{
 		result = default!;
@@ -24,12 +27,7 @@ internal sealed class WhileNode:  IStatementNode, IParseableNode<WhileNode>
 			return false;
 
 		stream = tokens;
-		result = new WhileNode
-		{
-			Condition = condition,
-			Block = block,
-		};
-
+		result = new WhileNode(condition, block);
 		return true;
 	}
 }

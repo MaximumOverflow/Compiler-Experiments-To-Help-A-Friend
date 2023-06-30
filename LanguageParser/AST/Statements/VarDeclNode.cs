@@ -1,15 +1,19 @@
-﻿using LanguageParser.Tokenizer;
-using LanguageParser.Parser;
+﻿namespace Squyrm.Parser.AST;
 
-namespace LanguageParser.AST;
-
-internal sealed class VarDeclNode:  IStatementNode, IParseableNode<VarDeclNode>
+public sealed class VarDeclNode:  IStatementNode, IParseableNode<VarDeclNode>
 {
 	public bool RequiresSemicolon => true;
 	
-	public required bool Constant { get; init; }
-	public required ReadOnlyMemory<char> Name { get; init; }
-	public required IExpressionNode Value { get; init; }
+	public bool Constant { get; }
+	public ReadOnlyMemory<char> Name { get; }
+	public IExpressionNode Value { get; }
+
+	internal VarDeclNode(bool constant, ReadOnlyMemory<char> name, IExpressionNode value)
+	{
+		Constant = constant;
+		Name = name;
+		Value = value;
+	}
 
 	public static bool TryParse(ref TokenStream stream, out VarDeclNode result)
 	{
@@ -29,12 +33,7 @@ internal sealed class VarDeclNode:  IStatementNode, IParseableNode<VarDeclNode>
 			return UnexpectedTokenException.Throw<bool>(tokens.Current);
 
 		stream = tokens;
-		result = new VarDeclNode
-		{
-			Name = name, 
-			Value = value,
-			Constant = firstToken.Type == TokenType.Const,
-		};
+		result = new VarDeclNode(firstToken.Type == TokenType.Const, name, value);
 		return true;
 	}
 }

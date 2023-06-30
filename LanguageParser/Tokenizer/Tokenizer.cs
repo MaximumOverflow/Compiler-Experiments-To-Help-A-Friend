@@ -1,6 +1,6 @@
 ﻿using System.Text.RegularExpressions;
 
-namespace LanguageParser.Tokenizer;
+namespace Squyrm.Parser;
 
 public static class Tokenizer
 {
@@ -99,7 +99,6 @@ public static class Tokenizer
 							"yes" => TokenType.True,
 							"yeet" => TokenType.Throw,
 							"otherwise" => TokenType.Else,
-							"nothing" => TokenType.Void,
 							"no" => TokenType.False,
 							"thing" => TokenType.Class,
 							"wield" => TokenType.Import,

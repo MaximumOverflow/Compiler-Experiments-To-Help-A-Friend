@@ -1,15 +1,12 @@
-﻿using LanguageParser.Tokenizer;
-using LanguageParser.Parser;
+﻿namespace Squyrm.Parser.AST;
 
-namespace LanguageParser.AST;
-
-internal sealed class BinaryOperationNode : IExpressionNode, IParseableNode<BinaryOperationNode>
+public sealed class BinaryOperationNode : IExpressionNode, IParseableNode<BinaryOperationNode>
 {
 	public BinaryOperationType Operation { get; }
 	public IExpressionNode Left { get; }
 	public IExpressionNode Right { get; }
 
-	public BinaryOperationNode(IExpressionNode left, IExpressionNode right, BinaryOperationType operation)
+	internal BinaryOperationNode(IExpressionNode left, IExpressionNode right, BinaryOperationType operation)
 	{
 		Left = left;
 		Right = right;

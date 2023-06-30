@@ -1,14 +1,11 @@
-﻿using LanguageParser.Tokenizer;
-using LanguageParser.Parser;
+﻿namespace Squyrm.Parser.AST;
 
-namespace LanguageParser.AST;
-
-internal sealed class BlockNode : IExpressionNode, IStatementNode, IParseableNode<BlockNode>
+public sealed class BlockNode : IExpressionNode, IStatementNode, IParseableNode<BlockNode>
 {
 	public bool RequiresSemicolon => false;
 	public IReadOnlyList<IStatementNode> StatementNodes { get; }
 
-	public BlockNode(IReadOnlyList<IStatementNode> statements)
+	internal BlockNode(IReadOnlyList<IStatementNode> statements)
 	{
 		StatementNodes = statements;
 	}

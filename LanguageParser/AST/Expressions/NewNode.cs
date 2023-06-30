@@ -1,12 +1,15 @@
-﻿using LanguageParser.Tokenizer;
-using LanguageParser.Parser;
+﻿namespace Squyrm.Parser.AST;
 
-namespace LanguageParser.AST;
-
-internal sealed class NewNode : IExpressionNode, IParseableNode<NewNode>
+public sealed class NewNode : IExpressionNode, IParseableNode<NewNode>
 {
-	public required TypeNode Type { get; init; }
-	public required IReadOnlyList<(ReadOnlyMemory<char>, IExpressionNode)> MemberAssignments { get; init; }
+	public TypeNode Type { get; }
+	public IReadOnlyList<(ReadOnlyMemory<char>, IExpressionNode)> MemberAssignments { get; }
+
+	internal NewNode(TypeNode type, IReadOnlyList<(ReadOnlyMemory<char>, IExpressionNode)> memberAssignments)
+	{
+		Type = type;
+		MemberAssignments = memberAssignments;
+	}
 
 	public static bool TryParse(ref TokenStream stream, out NewNode result)
 	{
@@ -70,11 +73,7 @@ internal sealed class NewNode : IExpressionNode, IParseableNode<NewNode>
 		}
 
 		stream = tokens;
-		result = new NewNode
-		{
-			Type = type,
-			MemberAssignments = memberAssignments,
-		};
+		result = new NewNode(type, memberAssignments);
 		return true;
 	}
 }

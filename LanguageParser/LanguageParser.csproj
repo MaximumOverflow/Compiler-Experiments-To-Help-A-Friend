@@ -1,16 +1,20 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
     <TargetFramework>net7.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>Squyrm.Parser</AssemblyName>
+    <RootNamespace>Squyrm.Parser</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="ClangSharp" Version="16.0.0" />
+    <PackageReference Include="libClangSharp.runtime.win-x64" Version="16.0.6" />
     <PackageReference Include="libLLVM.runtime.win-x64" Version="16.0.6" />
     <PackageReference Include="LLVMSharp" Version="16.0.0" />
+    <PackageReference Include="Pastel" Version="4.1.0" />
   </ItemGroup>
 
 </Project>

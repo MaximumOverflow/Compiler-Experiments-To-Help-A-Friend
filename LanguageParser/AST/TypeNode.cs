@@ -1,9 +1,6 @@
-﻿using LanguageParser.Tokenizer;
-using LanguageParser.Parser;
+﻿namespace Squyrm.Parser.AST;
 
-namespace LanguageParser.AST;
-
-internal abstract class TypeNode : IParseableNode<TypeNode>
+public abstract class TypeNode : IParseableNode<TypeNode>
 {
 	public static bool TryParse(ref TokenStream stream, out TypeNode result)
 	{
@@ -41,12 +38,12 @@ internal abstract class TypeNode : IParseableNode<TypeNode>
 	}
 }
 
-internal sealed class TypeNameNode : TypeNode
+public sealed class TypeNameNode : TypeNode
 {
 	public required ReadOnlyMemory<char> Name { get; init; }
 }
 
-internal sealed class PointerTypeNode : TypeNode
+public sealed class PointerTypeNode : TypeNode
 {
 	public required bool Constant { get; init; }
 	public required TypeNode Base { get; init; }

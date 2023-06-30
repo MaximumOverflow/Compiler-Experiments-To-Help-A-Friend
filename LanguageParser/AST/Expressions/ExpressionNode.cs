@@ -1,8 +1,6 @@
-﻿using LanguageParser.Parser;
+﻿namespace Squyrm.Parser.AST;
 
-namespace LanguageParser.AST;
-
-internal interface IExpressionNode : IStatementNode
+public interface IExpressionNode : IStatementNode
 {
 	public static bool TryParse(ref TokenStream stream, bool greedy, out IExpressionNode result)
 	{

@@ -1,11 +1,14 @@
-﻿using LanguageParser.Tokenizer;
-using LanguageParser.Parser;
-	
-namespace LanguageParser.AST;
+﻿namespace Squyrm.Parser.AST;
 
-internal sealed class ReturnNode:  IStatementNode, IParseableNode<ReturnNode>
+public sealed class ReturnNode:  IStatementNode, IParseableNode<ReturnNode>
 {
-	public required IExpressionNode? Value { get; init; }
+	public IExpressionNode? Value { get; }
+
+	internal ReturnNode(IExpressionNode? value)
+	{
+		Value = value;
+	}
+
 	public static bool TryParse(ref TokenStream stream, out ReturnNode result)
 	{
 		result = default!;
@@ -20,7 +23,7 @@ internal sealed class ReturnNode:  IStatementNode, IParseableNode<ReturnNode>
 			return UnexpectedTokenException.Throw<bool>(tokens.Current);
 
 		stream = tokens;
-		result = new ReturnNode { Value = value };
+		result = new ReturnNode(value);
 		return true;
 	}
 }

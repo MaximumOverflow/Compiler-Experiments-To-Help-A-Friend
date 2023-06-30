@@ -1,25 +1,22 @@
 ﻿using System.Diagnostics;
-using System.Runtime.InteropServices;
-using LanguageParser.Tokenizer;
-using LanguageParser.Parser;
 
-namespace LanguageParser.AST;
+namespace Squyrm.Parser.AST;
 
 public partial interface IAstNode {}
-internal interface IRootDeclarationNode : IAstNode {}
+public interface IRootDeclarationNode : IAstNode {}
 
-internal interface IStatementNode : IAstNode
+public interface IStatementNode : IAstNode
 {
 	public bool RequiresSemicolon => true;
 }
 
 
-internal interface IParseableNode<TSelf> : IAstNode
+public interface IParseableNode<TSelf> : IAstNode
 {
 	public static abstract bool TryParse(ref TokenStream stream, out TSelf result);
 }
 
-internal interface IParameterizedParseableNode<TSelf, in TParams>
+public interface IParameterizedParseableNode<TSelf, in TParams>
 {
 	public static abstract bool TryParse(ref TokenStream stream, TParams @params, out TSelf result);
 }
@@ -41,7 +38,7 @@ public sealed class UnexpectedTokenException : Exception
 		}
 	}
 
-	public UnexpectedTokenException(Token token, TokenType? expected = null)
+	internal UnexpectedTokenException(Token token, TokenType? expected = null)
 	{
 		Token = token;
 		Expected = expected;
@@ -62,7 +59,7 @@ public sealed class UnexpectedTokenException : Exception
 		}
 	}
 
-	public static T Throw<T>(Token? token, TokenType? expected = null)
+	internal static T Throw<T>(Token? token, TokenType? expected = null)
 	{
 		Debugger.Break();
 		throw new UnexpectedTokenException(token ?? throw new EndOfStreamException(), expected);

@@ -1,4 +1,4 @@
-﻿namespace LanguageParser.Tokenizer;
+﻿namespace Squyrm.Utilities;
 
 public struct PeekStream
 {

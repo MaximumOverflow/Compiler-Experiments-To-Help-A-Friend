@@ -1,7 +1,6 @@
-﻿using LanguageParser.Tokenizer;
-using LanguageParser.AST;
+﻿using Squyrm.Parser.AST;
 
-namespace LanguageParser.Parser;
+namespace Squyrm.Utilities;
 
 public ref struct TokenStream
 {

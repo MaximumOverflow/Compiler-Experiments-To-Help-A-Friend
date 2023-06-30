@@ -1,11 +1,13 @@
-﻿using LanguageParser.Parser;
-using LanguageParser.Tokenizer;
+﻿namespace Squyrm.Parser.AST;
 
-namespace LanguageParser.AST;
-
-internal sealed class TupleNode: IExpressionNode, IParseableNode<TupleNode>
+public sealed class TupleNode: IExpressionNode, IParseableNode<TupleNode>
 {
-	public required IReadOnlyList<IExpressionNode> Values { get; init; }
+	public IReadOnlyList<IExpressionNode> Values { get; }
+
+	internal TupleNode(IReadOnlyList<IExpressionNode> values)
+	{
+		Values = values;
+	}
 
 	public static bool TryParse(ref TokenStream stream, out TupleNode result)
 	{
@@ -22,7 +24,7 @@ internal sealed class TupleNode: IExpressionNode, IParseableNode<TupleNode>
 			tokens.MoveNext();
 			
 			stream = tokens;
-			result = new TupleNode { Values = values };
+			result = new TupleNode(values);
 			return true;
 		}
 
@@ -42,14 +44,19 @@ internal sealed class TupleNode: IExpressionNode, IParseableNode<TupleNode>
 		}
 
 		stream = tokens;
-		result = new TupleNode { Values = values };
+		result = new TupleNode(values);
 		return true;
 	}
 }
 
-internal sealed class ArrayNode: IExpressionNode, IParseableNode<ArrayNode>
+public sealed class ArrayNode: IExpressionNode, IParseableNode<ArrayNode>
 {
-	public required IReadOnlyList<IExpressionNode> Values { get; init; }
+	public IReadOnlyList<IExpressionNode> Values { get; }
+
+	internal ArrayNode(IReadOnlyList<IExpressionNode> values)
+	{
+		Values = values;
+	}
 
 	public static bool TryParse(ref TokenStream stream, out ArrayNode result)
 	{
@@ -66,7 +73,7 @@ internal sealed class ArrayNode: IExpressionNode, IParseableNode<ArrayNode>
 			tokens.MoveNext();
 			
 			stream = tokens;
-			result = new ArrayNode { Values = values };
+			result = new ArrayNode(values);
 			return true;
 		}
 
@@ -86,7 +93,7 @@ internal sealed class ArrayNode: IExpressionNode, IParseableNode<ArrayNode>
 		}
 
 		stream = tokens;
-		result = new ArrayNode { Values = values };
+		result = new ArrayNode(values);
 		return true;
 	}
 }

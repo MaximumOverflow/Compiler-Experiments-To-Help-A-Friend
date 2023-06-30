@@ -1,9 +1,6 @@
-﻿using System.CodeDom.Compiler;
-using System.Collections;
-using System.Reflection;
-using System.Runtime.CompilerServices;
+﻿using System.Reflection;
 
-namespace LanguageParser.AST;
+namespace Squyrm.Parser.AST;
 
 public partial interface IAstNode
 {

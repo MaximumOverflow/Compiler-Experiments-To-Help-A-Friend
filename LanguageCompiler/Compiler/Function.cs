@@ -1,15 +1,25 @@
-﻿using LanguageParser.AST;
-using LLVMSharp.Interop;
-
-namespace LanguageParser.Compiler;
+﻿namespace Squyrm.Compiler;
 
 public sealed class Function
 {
-	public required bool Public { get; init; }
-	public required FunctionType Type { get; init; }
-	public required LLVMValueRef LlvmValue { get; init; }
-	public required ReadOnlyMemory<char> Name { get; init; }
-	public required IReadOnlyList<ReadOnlyMemory<char>> ParameterNames { get; init; }
+	public bool Public { get; }
+	public FunctionType Type { get; }
+	public LLVMValueRef LlvmValue { get; }
+	public ReadOnlyMemory<char> Name { get; }
+	public IReadOnlyList<ReadOnlyMemory<char>> ParameterNames { get; }
+
+	public Function(
+		CompilationContext context,
+		ReadOnlyMemory<char> name, bool @public, 
+		FunctionType type, IReadOnlyList<ReadOnlyMemory<char>> parameterNames
+	)
+	{
+		Type = type;
+		Name = name;
+		Public = @public;
+		ParameterNames = parameterNames;
+		LlvmValue = context.LlvmModule.AddFunction(name.Span, type);
+	}
 
 	internal static void SetBody(FileCompilationContext context, Function function, BlockNode body)
 	{
