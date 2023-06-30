@@ -3,7 +3,9 @@ using ClangSharp.Interop;
 using System.Text;
 using ClangSharp;
 using Pastel;
-
+using Squyrm.Compiler;
+using PointerType = ClangSharp.PointerType;
+using TranslationUnit = ClangSharp.TranslationUnit;
 using Type = ClangSharp.Type;
 
 namespace Squyrm.BindGen;
@@ -12,12 +14,16 @@ public static class CBindingsGenerator
 {
 	public static string GenerateSquyrmBindings(string filePath, string @namespace)
 	{
-		var translationUnit = TranslationUnit.GetOrCreate(
-			CXTranslationUnit.Parse(
-				CXIndex.Create(), filePath, 
-				default, default, CXTranslationUnit_Flags.CXTranslationUnit_None
-			)
+		var result = CXTranslationUnit.TryParse(
+			CXIndex.Create(), filePath, default, default,
+			CXTranslationUnit_Flags.CXTranslationUnit_None,
+			out var handle
 		);
+
+		if (result != CXErrorCode.CXError_Success)
+			throw new CompilationException($"BindGen returned '{result}'.");
+		
+		var translationUnit = TranslationUnit.GetOrCreate(handle);
 
 		var src = new StringBuilder();
 		src.Append(@namespace);

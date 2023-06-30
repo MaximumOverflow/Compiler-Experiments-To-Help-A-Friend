@@ -1,5 +1,4 @@
 ﻿using System.Diagnostics;
-using ClangSharp.Interop;
 using Squyrm.Utilities;
 using Squyrm.Compiler;
 using CommandLine;
@@ -29,6 +28,7 @@ public sealed class BuildOptions
 
 public enum OutputFormat
 {
+	Asm,
 	LlvmIR,
 	StaticLib,
 	DynamicLib,
@@ -37,7 +37,7 @@ public enum OutputFormat
 
 public static class Build
 {
-	public static int Execute(BuildOptions options)
+	public static unsafe int Execute(BuildOptions options)
 	{
 		if (!Path.Exists(options.Path))
 		{
@@ -66,38 +66,18 @@ public static class Build
 			ModuleName = options.ModuleName ?? "Unnamed module",
 			OptimizationLevel = options.OptimizationLevel,
 			EmitReflectionInformation = options.EmitReflectionMetadata,
-		});
+		}, files);
 
 		var allStats = new RuntimeStats();
 
+		LLVMModuleRef llvmModule;
 		try
 		{
-			{
-				var stats = new RuntimeStats();
-				foreach (var file in files)
-					context.ParseSourceFile(file);
-
-				stats.Dump("Parsing", ConsoleColor.Blue);
-			}
-			{
-				var stats = new RuntimeStats();
-				context.CompileParsedFiles();
-				stats.Dump("LLVM IR generation", ConsoleColor.Blue);
-			}
-			{
-				var stats = new RuntimeStats();
-				context.FinalizeCompilation();
-				stats.Dump("Reflection metadata generation and IR optimization", ConsoleColor.Blue);
-			}
+			llvmModule = context.Compile();
 		}
 		catch (CompilationException e)
 		{
 			e.Dump(ConsoleColor.Red);
-			return 1;
-		}
-		catch (Exception e)
-		{
-			Console.WriteLine(e.ToString().Pastel(ConsoleColor.Red));
 			return 1;
 		}
 
@@ -116,22 +96,47 @@ public static class Build
 		
 		switch (options.OutputFormat)
 		{
+			case OutputFormat.Asm:
+			{
+				var path = Path.Join(dir, "out.asm");
+				var cpu = new string(LLVM.GetHostCPUName());
+				var features = new string(LLVM.GetHostCPUFeatures());
+
+				var optLevel = (LLVMCodeGenOptLevel) options.OptimizationLevel;
+				var target = LLVMTargetRef.GetTargetFromTriple(LLVMTargetRef.DefaultTriple);
+				var machine = target.CreateTargetMachine(LLVMTargetRef.DefaultTriple, cpu, features,
+					optLevel, LLVMRelocMode.LLVMRelocDefault,
+					LLVMCodeModel.LLVMCodeModelDefault);
+
+				machine.EmitToFile(llvmModule, path, LLVMCodeGenFileType.LLVMAssemblyFile);
+				break;
+			}
+			
 			case OutputFormat.LlvmIR:
 			{
 				var path = Path.Join(dir, "out.ll");
-				context.LlvmModule.PrintToFile(path);
+				llvmModule.PrintToFile(path);
 				break;
 			}
 
 			case OutputFormat.Executable:
 			{
-				var ir = Path.Join(dir, "out.bc");
-				context.LlvmModule.WriteBitcodeToFile(ir);
+				var path = Path.Join(dir, "out.o");
+				var cpu = new string(LLVM.GetHostCPUName());
+				var features = new string(LLVM.GetHostCPUFeatures());
+
+				var optLevel = (LLVMCodeGenOptLevel) options.OptimizationLevel;
+				var target = LLVMTargetRef.GetTargetFromTriple(LLVMTargetRef.DefaultTriple);
+				var machine = target.CreateTargetMachine(LLVMTargetRef.DefaultTriple, cpu, features,
+					optLevel, LLVMRelocMode.LLVMRelocDefault,
+					LLVMCodeModel.LLVMCodeModelDefault);
+
+				machine.EmitToFile(llvmModule, path, LLVMCodeGenFileType.LLVMObjectFile);
 				var clang = Process.Start(new ProcessStartInfo
 				{
 					FileName = "clang",
 					WorkingDirectory = dir,
-					Arguments = "out.bc -o out.exe",
+					Arguments = "out.o -o out.exe",
 				});
 				
 				if (clang is null)
@@ -141,7 +146,7 @@ public static class Build
 				}
 				
 				clang.WaitForExit();
-				File.Delete(ir);
+				File.Delete(path);
 				break;
 			}
 			

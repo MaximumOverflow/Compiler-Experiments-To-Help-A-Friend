@@ -198,10 +198,13 @@ internal static class Expressions
 				Left: VariableNode { Name.Span: "__get_reflection_metadata__" }, 
 			}:
 			{
+				if (block.Context.GlobalContext.ReflectionInfo is not { MetadataValues: var metadataValues })
+					throw new CompilationException("Cannot access metadata information when metadata generation is disabled.");
+				
 				if (rightExpr is not TupleNode { Values: [ConstantNode { Value: ReadOnlyMemory<char> name }] })
 					return ThrowArgumentException("Expected string literal.");
 
-				if(!block.Context.GlobalContext.Metadata.TryGetValue(name, out var global))
+				if(!metadataValues.TryGetValue(name, out var global))
 					throw new KeyNotFoundException($"Unknown reflection metadata key '{name}'.");
 
 				var type = ((PointerType) global.Type).Base;
@@ -261,7 +264,7 @@ internal static class Expressions
 					return ThrowArgumentException($"Cannot index a value of type '{arrayType}'.");
 				
 				if(indexType.LlvmType.Kind != LLVMTypeKind.LLVMIntegerTypeKind)
-					throw new ArgumentException($"'{indexType}' is not a valid index type.");
+					ThrowArgumentException($"'{indexType}' is not a valid index type.");
 
 				if (indexType.LlvmType.IntWidth < 64)
 					index = builder.BuildIntCast(index, block.LlvmContext.Int64Type);
@@ -398,7 +401,13 @@ internal static class Expressions
 	}
 
 	private static Value ThrowArgumentException(string message)
-		=> throw new CompilationException(message);
+	{
+		Debugger.Break();
+		throw new CompilationException(message);
+	}
 }
 
-internal readonly record struct Value(LLVMValueRef LlvmValue, Type Type);
+internal readonly record struct Value(LLVMValueRef LlvmValue, Type Type)
+{
+	public static implicit operator LLVMValueRef(Value value) => value.LlvmValue;
+}

@@ -9,6 +9,8 @@ public sealed class Function
 	public ReadOnlyMemory<char> Name { get; }
 	public IReadOnlyList<ReadOnlyMemory<char>> ParameterNames { get; }
 
+	internal ulong MetadataTableOffset;
+
 	public Function(
 		CompilationContext context,
 		ReadOnlyMemory<char> name, bool @public, 
@@ -21,9 +23,10 @@ public sealed class Function
 		Public = @public;
 		ParameterNames = parameterNames;
 		LlvmValue = context.LlvmModule.AddFunction(name.Span, type);
+		MetadataTableOffset = context.ReflectionInfo?.RegisterFunction(this) ?? 0;
 	}
 
-	internal static void SetBody(FileCompilationContext context, Function function, BlockNode body)
+	internal static void SetBody(TranslationUnit context, Function function, BlockNode body)
 	{
 		ClearBody(function.LlvmValue);
 		using var builder = context.GlobalContext.LlvmContext.CreateBuilder();

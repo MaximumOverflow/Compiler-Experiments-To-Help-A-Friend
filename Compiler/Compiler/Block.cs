@@ -6,13 +6,13 @@ internal sealed class Block
 	private readonly BlockNode _node;
 	private readonly Function _function;
 	public readonly LLVMBasicBlockRef EntryBlock;
-	public readonly FileCompilationContext Context;
+	public readonly TranslationUnit Context;
 	private readonly Dictionary<ReadOnlyMemory<char>, Variable> _variables;
 
 	public LLVMContextRef LlvmContext => Context.GlobalContext.LlvmContext;
 	public IReadOnlyDictionary<ReadOnlyMemory<char>, Variable> Variables => _variables;
 	
-	public Block(BlockNode node, Function function, FileCompilationContext context)
+	public Block(BlockNode node, Function function, TranslationUnit context)
 	{
 		_node = node;
 		Context = context;

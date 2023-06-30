@@ -1,4 +1,5 @@
 ﻿using System.Collections.Immutable;
+using ReflectionInfo = Squyrm.Compiler.Compiler.Passes.ReflectionGenerationPass.ReflectionInfo;
 
 namespace Squyrm.Compiler;
 
@@ -11,18 +12,14 @@ public abstract class Type : IEquatable<Type>
 
 	private PointerType? _pointerType;
 	private PointerType? _constPointerType;
-	internal readonly CompilationContext CompilationContext;
-	
 	internal readonly ulong MetadataTableOffset;
-	internal LLVMValueRef LlvmMetadataTableOffset => LLVMValueRef.CreateConstInt(
-		CompilationContext.LlvmContext.Int64Type, MetadataTableOffset
-	);
+	protected internal readonly ReflectionInfo? Reflection;
 
-	internal Type(CompilationContext context, LLVMTypeRef llvmType)
+	internal Type(LLVMTypeRef llvmType, ReflectionInfo? reflection)
 	{
 		LlvmType = llvmType;
-		CompilationContext = context;
-		MetadataTableOffset = context.RegisterTypeForReflection(this);
+		Reflection = reflection;
+		MetadataTableOffset = reflection?.RegisterType(this) ?? 0;
 	}
 
 	public PointerType MakePointer(bool @const)
@@ -87,10 +84,10 @@ public class IntrinsicType : Type
 	public override bool Public => false;
 	public override ReadOnlyMemory<char> Name { get; }
 
-	public IntrinsicType(CompilationContext context, string name, LLVMTypeRef llvmType) 
-		: this(context, name.AsMemory(), llvmType) {}
+	internal IntrinsicType(string name, LLVMTypeRef llvmType, ReflectionInfo? reflection) 
+		: this(name.AsMemory(), llvmType, reflection) {}
 
-	protected IntrinsicType(CompilationContext context, ReadOnlyMemory<char> name, LLVMTypeRef llvmType) : base(context, llvmType)
+	internal IntrinsicType(ReadOnlyMemory<char> name, LLVMTypeRef llvmType, ReflectionInfo? reflection) : base(llvmType, reflection)
 	{
 		Name = name;
 	}
@@ -101,8 +98,8 @@ public sealed class IntegerType : IntrinsicType
 	public uint Bits { get; }
 	public bool Unsigned { get; }
 	
-	public IntegerType(CompilationContext context, uint bits, bool unsigned) 
-		: base(context, MakeName(bits, unsigned), context.LlvmContext.GetIntType(bits))
+	internal IntegerType(LLVMContextRef ctx, uint bits, bool unsigned, ReflectionInfo? reflection) 
+		: base(MakeName(bits, unsigned), ctx.GetIntType(bits), reflection)
 	{
 		Bits = bits;
 		Unsigned = unsigned;
@@ -120,12 +117,12 @@ public sealed class PointerType : Type
 	public bool Constant { get; }
 	public override ReadOnlyMemory<char> Name { get; }
 
-	public PointerType(Type @base, bool @const) 
-		: base(@base.CompilationContext, LLVMTypeRef.CreatePointer(@base, 0))
+	internal PointerType(Type @base, bool @const) 
+		: base(LLVMTypeRef.CreatePointer(@base, 0), @base.Reflection)
 	{
 		Base = @base;
 		Constant = @const;
-		Name = $"{@base.Name}*".AsMemory();
+		Name = $"*{(@const ? "unrelenting " : "")}{@base.Name}".AsMemory();
 	}
 
 	public override bool IsCompatibleWith(Type other)
@@ -167,10 +164,11 @@ public sealed class StructType : Type
 	public IReadOnlyDictionary<ReadOnlyMemory<char>, TypeMember> Fields { get; private set; }
 
 	private StructType(
-		CompilationContext context,
 		ReadOnlyMemory<char> name,
 		LLVMTypeRef llvmType, 
-		IReadOnlyDictionary<ReadOnlyMemory<char>, TypeMember> fields) : base(context, llvmType)
+		IReadOnlyDictionary<ReadOnlyMemory<char>, TypeMember> fields,
+		ReflectionInfo? reflection
+	) : base(llvmType, reflection)
 	{
 		Name = name;
 		Fields = fields;
@@ -179,7 +177,7 @@ public sealed class StructType : Type
 	internal static StructType Create(CompilationContext context, ReadOnlyMemory<char> name)
 	{
 		var llvmType = context.LlvmContext.CreateNamedStruct(name.Span);
-		return new StructType(context, name, llvmType, ImmutableDictionary<ReadOnlyMemory<char>, TypeMember>.Empty);
+		return new StructType(name, llvmType, ImmutableDictionary<ReadOnlyMemory<char>, TypeMember>.Empty, context.ReflectionInfo);
 	}
 
 	internal static StructType Create(
@@ -189,10 +187,7 @@ public sealed class StructType : Type
 	)
 	{
 		var llvmType = context.LlvmContext.CreateNamedStruct(name.Span);
-		var type = new StructType(
-			context, name, llvmType, 
-			ImmutableDictionary<ReadOnlyMemory<char>, TypeMember>.Empty
-		);
+		var type = new StructType(name, llvmType, ImmutableDictionary<ReadOnlyMemory<char>, TypeMember>.Empty, context.ReflectionInfo);
 		
 		if(members.Count != 0)
 			type.SetBody(members);
@@ -200,19 +195,22 @@ public sealed class StructType : Type
 		return type;
 	}
 
-	internal void SetBody(IReadOnlyList<(ReadOnlyMemory<char>, Type)> members)
+	internal void SetBody(IReadOnlyList<(ReadOnlyMemory<char>, Type)> fields)
 	{
-		Span<LLVMTypeRef> memberTypes = stackalloc LLVMTypeRef[members.Count];
+		var prevFieldCount = (uint) Fields.Count;
+		
+		Span<LLVMTypeRef> fieldTypes = stackalloc LLVMTypeRef[fields.Count];
 		var memberDictionary = new Dictionary<ReadOnlyMemory<char>, TypeMember>(MemoryStringComparer.Instance);
-		for (var i = 0; i < members.Count; i++)
+		for (var i = 0; i < fields.Count; i++)
 		{
-			var (memberName, memberType) = members[i];
-			memberTypes[i] = memberType.LlvmType;
-			memberDictionary.Add(memberName, new TypeMember { Idx = (uint) i, Name = memberName, Type = memberType });
+			var (fieldName, fieldType) = fields[i];
+			fieldTypes[i] = fieldType.LlvmType;
+			memberDictionary.Add(fieldName, new TypeMember { Idx = (uint) i, Name = fieldName, Type = fieldType });
 		}
 
 		Fields = memberDictionary;
-		LlvmType.StructSetBody(memberTypes, false);
+		LlvmType.StructSetBody(fieldTypes, false);
+		Reflection?.UpdateTypeFieldCount(this, prevFieldCount);
 	}
 }
 
@@ -223,8 +221,8 @@ public sealed class FunctionType : Type
 	public IReadOnlyList<Type> ParameterTypes { get; }
 	public override ReadOnlyMemory<char> Name { get; }
 
-	public FunctionType(Type returnType, IReadOnlyList<Type> parameterTypes, bool variadic) 
-		: base(returnType.CompilationContext, MakeLlvmType(returnType, parameterTypes, variadic))
+	internal FunctionType(Type returnType, IReadOnlyList<Type> parameterTypes, bool variadic) 
+		: base(MakeLlvmType(returnType, parameterTypes, variadic), returnType.Reflection)
 	{
 		Variadic = variadic;
 		ReturnType = returnType;

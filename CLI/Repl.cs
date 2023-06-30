@@ -42,25 +42,26 @@ public static class Repl
 					{
 						try
 						{
-							using var context = new CompilationContext(new CompilationSettings
-							{
-								ModuleName = "Repl",
-								EmitReflectionInformation = true,
-								OptimizationLevel = options.OptimizationLevel,
-							});
-							
-							context.CompileSourceCode(script.ToString());
-							context.FinalizeCompilation();
-						
-							var main = context.LlvmModule.GetNamedFunction("main");
-							if (main == default) return false;
-							if (main.ParamsCount != 0) return false;
-							var engine = context.LlvmModule.CreateExecutionEngine();
-							var mainFn = engine.GetPointerToGlobal<MainDelegate>(main);
+							throw new NotImplementedException();
+							// using var context = new CompilationContext(new CompilationSettings
+							// {
+							// 	ModuleName = "Repl",
+							// 	EmitReflectionInformation = true,
+							// 	OptimizationLevel = options.OptimizationLevel,
+							// });
+							//
+							// context.CompileSourceCode(script.ToString());
+							// context.FinalizeCompilation();
+							//
+							// var main = context.LlvmModule.GetNamedFunction("main");
+							// if (main == default) return false;
+							// if (main.ParamsCount != 0) return false;
+							// var engine = context.LlvmModule.CreateExecutionEngine();
+							// var mainFn = engine.GetPointerToGlobal<MainDelegate>(main);
 
-							Console.ForegroundColor = ConsoleColor.Blue;
-							Console.WriteLine("\nExecuting program...");
-							Console.WriteLine($"\nProgram exited with value {mainFn()}.");
+							// Console.ForegroundColor = ConsoleColor.Blue;
+							// Console.WriteLine("\nExecuting program...");
+							// Console.WriteLine($"\nProgram exited with value {mainFn()}.");
 						}
 						catch (Exception e)
 						{
