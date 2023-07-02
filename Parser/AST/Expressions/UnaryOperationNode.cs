@@ -18,18 +18,6 @@ public sealed class UnaryOperationNode : IExpressionNode, IParseableNode<UnaryOp
 
 		switch (tokens.MoveNext())
 		{
-			case { Type: TokenType.OpenRound }:
-			{
-				if (!IExpressionNode.TryParse(ref tokens, false, out var value))
-					return UnexpectedTokenException.Throw<bool>(tokens.Current);
-		
-				if (tokens.MoveNext() is not {Type: TokenType.CloseRound})
-					return false;
-
-				result = new UnaryOperationNode(value, UnaryOperationType.Group);
-				break;
-			}
-
 			case { Type: TokenType.Subtraction }:
 			{
 				if (!IExpressionNode.TryParse(ref tokens, false, out var value))
@@ -89,7 +77,6 @@ public sealed class UnaryOperationNode : IExpressionNode, IParseableNode<UnaryOp
 
 public enum UnaryOperationType
 {
-	Group,
 	Negate,
 	AddrOf,
 	ValueOf,

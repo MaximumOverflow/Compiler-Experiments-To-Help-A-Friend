@@ -3,13 +3,13 @@
 public sealed class ForNode:  IStatementNode, IParseableNode<ForNode>
 {
 	public bool RequiresSemicolon => false;
-	public ReadOnlyMemory<char> Var { get; }
+	public ReadOnlyMemory<char> VarName { get; }
 	public IExpressionNode Enumerable { get; }
 	public BlockNode Block { get; }
 
-	internal ForNode(ReadOnlyMemory<char> var, IExpressionNode enumerable, BlockNode block)
+	internal ForNode(ReadOnlyMemory<char> varName, IExpressionNode enumerable, BlockNode block)
 	{
-		Var = var;
+		VarName = varName;
 		Enumerable = enumerable;
 		Block = block;
 	}

@@ -8,7 +8,7 @@ internal static class Expressions
 	{
 		switch (expr)
 		{
-			case UnaryOperationNode { Operation: UnaryOperationType.Group, Expression: IExpressionNode vExpr }:
+			case RoundBracketedValueList { Values: [var vExpr] }:
 				return CompileExpression(block, builder, vExpr, asRef);
 			
 			case UnaryOperationNode { Operation: UnaryOperationType.AddrOf, Expression: IExpressionNode vExpr }:
@@ -143,7 +143,7 @@ internal static class Expressions
 				throw new KeyNotFoundException($"Variable '{name}' does not exist.");
 			}
 
-			case BinaryOperationNode { Left: var leftExpr, Right: VariableNode rightExpr, Operation: BinaryOperationType.Access }:
+			case BinaryExpressionNode { Left: var leftExpr, Right: VariableNode rightExpr, Operation: BinaryOperation.Access }:
 			{
 				var (obj, objType) = CompileExpression(block, builder, leftExpr, asRef);
 
@@ -179,7 +179,7 @@ internal static class Expressions
 				}
 			}
 
-			case BinaryOperationNode { Left: var leftExpr, Right: IExpressionNode rightExpr, Operation: BinaryOperationType.Assign }:
+			case BinaryExpressionNode { Left: var leftExpr, Right: IExpressionNode rightExpr, Operation: BinaryOperation.Assign }:
 			{
 				var (variable, varType) = CompileExpression(block, builder, leftExpr, true);
 				var (value, type) = CompileExpression(block, builder, rightExpr, false);
@@ -191,17 +191,17 @@ internal static class Expressions
 				return new(value, type);
 			}
 			
-			case BinaryOperationNode
+			case BinaryExpressionNode
 			{
 				Right: var rightExpr,
-				Operation: BinaryOperationType.Call,
+				Operation: BinaryOperation.Call,
 				Left: VariableNode { Name.Span: "__get_reflection_metadata__" }, 
 			}:
 			{
 				if (block.Context.GlobalContext.ReflectionInfo is not { MetadataValues: var metadataValues })
 					throw new CompilationException("Cannot access metadata information when metadata generation is disabled.");
 				
-				if (rightExpr is not TupleNode { Values: [ConstantNode { Value: ReadOnlyMemory<char> name }] })
+				if (rightExpr is not RoundBracketedValueList { Values: [ConstantNode { Value: ReadOnlyMemory<char> name }] })
 					return ThrowArgumentException("Expected string literal.");
 
 				if(!metadataValues.TryGetValue(name, out var global))
@@ -212,7 +212,7 @@ internal static class Expressions
 				return new Value(value, type);
 			}
 
-			case BinaryOperationNode { Left: var leftExpr, Right: TupleNode rightExpr, Operation: BinaryOperationType.Call }:
+			case BinaryExpressionNode { Left: var leftExpr, Right: RoundBracketedValueList rightExpr, Operation: BinaryOperation.Call }:
 			{
 				var (function, type) = CompileExpression(block, builder, leftExpr, false);
 
@@ -255,7 +255,12 @@ internal static class Expressions
 				return new(result, functionType.ReturnType);
 			}
 
-			case BinaryOperationNode { Left: var leftExpr, Right: IExpressionNode rightExpr, Operation: BinaryOperationType.Indexing }:
+			case BinaryExpressionNode
+			{
+				Left: var leftExpr, 
+				Right: SquareBracketedValueList {Values: [var rightExpr]}, 
+				Operation: BinaryOperation.Indexing,
+			}:
 			{
 				var (array, arrayType) = CompileExpression(block, builder, leftExpr, false);
 				var (index, indexType) = CompileExpression(block, builder, rightExpr, false);
@@ -276,7 +281,7 @@ internal static class Expressions
 					: new(builder.BuildLoad2(ptr.Base, value), ptr.Base);
 			}
 
-			case BinaryOperationNode { Left: var leftExpr, Right: TypeNode rightExpr, Operation: BinaryOperationType.Cast }:
+			case BinaryExpressionNode { Left: var leftExpr, Right: TypeNode rightExpr, Operation: BinaryOperation.Cast }:
 			{
 				var value = CompileExpression(block, builder, leftExpr, false);
 				var type = block.Context.FindType(rightExpr);
@@ -296,7 +301,7 @@ internal static class Expressions
 				}
 			}
 				
-			case BinaryOperationNode { Left: var leftExpr, Right: IExpressionNode rightExpr, Operation: var op }:
+			case BinaryExpressionNode { Left: var leftExpr, Right: IExpressionNode rightExpr, Operation: var op }:
 			{
 				var (leftValue, leftType) = CompileExpression(block, builder, leftExpr, false);
 				var (rightValue, rightType) = CompileExpression(block, builder, rightExpr, false);
@@ -316,63 +321,63 @@ internal static class Expressions
 				
 				switch (leftType.LlvmType.Kind, op)
 				{
-					case (LLVMTypeKind.LLVMIntegerTypeKind, BinaryOperationType.Addition):
+					case (LLVMTypeKind.LLVMIntegerTypeKind, BinaryOperation.Addition):
 						(leftValue, rightValue) = UniformizeIntegers(leftValue, rightValue, builder);
 						return new(builder.BuildAdd(leftValue, rightValue), leftType);
 
-					case (LLVMTypeKind.LLVMIntegerTypeKind, BinaryOperationType.Subtraction):
+					case (LLVMTypeKind.LLVMIntegerTypeKind, BinaryOperation.Subtraction):
 						(leftValue, rightValue) = UniformizeIntegers(leftValue, rightValue, builder);
 						return new(builder.BuildSub(leftValue, rightValue), leftType);
 
-					case (LLVMTypeKind.LLVMIntegerTypeKind, BinaryOperationType.Multiplication):
+					case (LLVMTypeKind.LLVMIntegerTypeKind, BinaryOperation.Multiplication):
 						(leftValue, rightValue) = UniformizeIntegers(leftValue, rightValue, builder);
 						return new(builder.BuildMul(leftValue, rightValue), leftType);
 					
-					case (LLVMTypeKind.LLVMIntegerTypeKind, BinaryOperationType.Division):
+					case (LLVMTypeKind.LLVMIntegerTypeKind, BinaryOperation.Division):
 						(leftValue, rightValue) = UniformizeIntegers(leftValue, rightValue, builder);
 						return new(builder.BuildSDiv(leftValue, rightValue), leftType);
 					
-					case (LLVMTypeKind.LLVMIntegerTypeKind, BinaryOperationType.Modulo):
+					case (LLVMTypeKind.LLVMIntegerTypeKind, BinaryOperation.Modulo):
 						(leftValue, rightValue) = UniformizeIntegers(leftValue, rightValue, builder);
 						return new(builder.BuildSRem(leftValue, rightValue), leftType);
 					
-					case (LLVMTypeKind.LLVMIntegerTypeKind, BinaryOperationType.CmpLt):
+					case (LLVMTypeKind.LLVMIntegerTypeKind, BinaryOperation.CmpLt):
 						(leftValue, rightValue) = UniformizeIntegers(leftValue, rightValue, builder);
 						return new(builder.BuildICmp(LLVMIntPredicate.LLVMIntSLT, leftValue, rightValue), block.Context.FindType("maybe"));
 					
-					case (LLVMTypeKind.LLVMIntegerTypeKind, BinaryOperationType.CmpLe):
+					case (LLVMTypeKind.LLVMIntegerTypeKind, BinaryOperation.CmpLe):
 						(leftValue, rightValue) = UniformizeIntegers(leftValue, rightValue, builder);
 						return new(builder.BuildICmp(LLVMIntPredicate.LLVMIntSLE, leftValue, rightValue), block.Context.FindType("maybe"));
 					
-					case (LLVMTypeKind.LLVMIntegerTypeKind, BinaryOperationType.CmpGt):
+					case (LLVMTypeKind.LLVMIntegerTypeKind, BinaryOperation.CmpGt):
 						(leftValue, rightValue) = UniformizeIntegers(leftValue, rightValue, builder);
 						return new(builder.BuildICmp(LLVMIntPredicate.LLVMIntSGT, leftValue, rightValue), block.Context.FindType("maybe"));
 					
-					case (LLVMTypeKind.LLVMIntegerTypeKind, BinaryOperationType.CmpGe):
+					case (LLVMTypeKind.LLVMIntegerTypeKind, BinaryOperation.CmpGe):
 						(leftValue, rightValue) = UniformizeIntegers(leftValue, rightValue, builder);
 						return new(builder.BuildICmp(LLVMIntPredicate.LLVMIntSGE, leftValue, rightValue), block.Context.FindType("maybe"));
 					
-					case (LLVMTypeKind.LLVMIntegerTypeKind, BinaryOperationType.CmpEq):
+					case (LLVMTypeKind.LLVMIntegerTypeKind, BinaryOperation.CmpEq):
 						(leftValue, rightValue) = UniformizeIntegers(leftValue, rightValue, builder);
 						return new(builder.BuildICmp(LLVMIntPredicate.LLVMIntEQ, leftValue, rightValue), block.Context.FindType("maybe"));
 					
-					case (LLVMTypeKind.LLVMIntegerTypeKind, BinaryOperationType.CmpNe):
+					case (LLVMTypeKind.LLVMIntegerTypeKind, BinaryOperation.CmpNe):
 						(leftValue, rightValue) = UniformizeIntegers(leftValue, rightValue, builder);
 						return new(builder.BuildICmp(LLVMIntPredicate.LLVMIntNE, leftValue, rightValue), block.Context.FindType("maybe"));
 
-					case (LLVMTypeKind.LLVMDoubleTypeKind or LLVMTypeKind.LLVMFloatTypeKind, BinaryOperationType.Addition):
+					case (LLVMTypeKind.LLVMDoubleTypeKind or LLVMTypeKind.LLVMFloatTypeKind, BinaryOperation.Addition):
 						return new(builder.BuildFAdd(leftValue, rightValue), leftType);
 					
-					case (LLVMTypeKind.LLVMDoubleTypeKind or LLVMTypeKind.LLVMFloatTypeKind, BinaryOperationType.Subtraction):
+					case (LLVMTypeKind.LLVMDoubleTypeKind or LLVMTypeKind.LLVMFloatTypeKind, BinaryOperation.Subtraction):
 						return new(builder.BuildFSub(leftValue, rightValue), leftType);
 					
-					case (LLVMTypeKind.LLVMDoubleTypeKind or LLVMTypeKind.LLVMFloatTypeKind, BinaryOperationType.Multiplication):
+					case (LLVMTypeKind.LLVMDoubleTypeKind or LLVMTypeKind.LLVMFloatTypeKind, BinaryOperation.Multiplication):
 						return new(builder.BuildFMul(leftValue, rightValue), leftType);
 					
-					case (LLVMTypeKind.LLVMDoubleTypeKind or LLVMTypeKind.LLVMFloatTypeKind, BinaryOperationType.Division):
+					case (LLVMTypeKind.LLVMDoubleTypeKind or LLVMTypeKind.LLVMFloatTypeKind, BinaryOperation.Division):
 						return new(builder.BuildFDiv(leftValue, rightValue), leftType);
 					
-					case (LLVMTypeKind.LLVMDoubleTypeKind or LLVMTypeKind.LLVMFloatTypeKind, BinaryOperationType.Modulo):
+					case (LLVMTypeKind.LLVMDoubleTypeKind or LLVMTypeKind.LLVMFloatTypeKind, BinaryOperation.Modulo):
 						return new(builder.BuildFRem(leftValue, rightValue), leftType);
 					
 					default:

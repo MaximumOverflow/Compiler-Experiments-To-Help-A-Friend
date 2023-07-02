@@ -1,126 +1,215 @@
 ﻿namespace Squyrm.Parser.AST;
 
-public sealed class BinaryOperationNode : IExpressionNode, IParseableNode<BinaryOperationNode>
+public sealed class BinaryExpressionNode : IExpressionNode, IParseableNode<BinaryExpressionNode>
 {
-	public BinaryOperationType Operation { get; }
+	public BinaryOperation Operation { get; }
 	public IExpressionNode Left { get; }
 	public IAstNode Right { get; }
 
-	internal BinaryOperationNode(IExpressionNode left, IAstNode right, BinaryOperationType operation)
+	internal BinaryExpressionNode(IExpressionNode left, IAstNode right, BinaryOperation operation)
 	{
 		Left = left;
 		Right = right;
 		Operation = operation;
 	}
 
-	public static bool TryParse(ref TokenStream stream,  out BinaryOperationNode result)
+	public static bool TryParse(ref TokenStream stream,  out BinaryExpressionNode result)
 	{
 		result = default!;
 		var tokens = stream;
 		
 		if (!tokens.Valid) 
 			return false;
-
-		if (!IExpressionNode.TryParse(ref tokens, true, out var left))
-			return UnexpectedTokenException.Throw<bool>(tokens.Current);
-
-		BinaryOperationType? op = tokens.MoveNext() switch
-		{
-			{ Type: TokenType.Period } => BinaryOperationType.Access,
-			{ Type: TokenType.Addition } => BinaryOperationType.Addition,
-			{ Type: TokenType.Division } => BinaryOperationType.Division,
-			{ Type: TokenType.Exponential } => BinaryOperationType.Exponential,
-			{ Type: TokenType.Subtraction } => BinaryOperationType.Subtraction,
-			{ Type: TokenType.Multiplication } => BinaryOperationType.Multiplication,
-			{ Type: TokenType.Modulo } => BinaryOperationType.Modulo,
-			{ Type: TokenType.Range } => BinaryOperationType.Range,
-			{ Type: TokenType.Equal } => BinaryOperationType.CmpEq,
-			{ Type: TokenType.NotEqual } => BinaryOperationType.CmpNe,
-			{ Type: TokenType.LargerThan } => BinaryOperationType.CmpGt,
-			{ Type: TokenType.LessThan } => BinaryOperationType.CmpLt,
-			{ Type: TokenType.LargerThanOrEqual } => BinaryOperationType.CmpGe,
-			{ Type: TokenType.LessThanOrEqual } => BinaryOperationType.CmpLe,
-			{ Type: TokenType.OpenRound } => BinaryOperationType.Call,
-			{ Type: TokenType.OpenSquare } => BinaryOperationType.Indexing,
-			{ Type: TokenType.AssignmentSeparator } => BinaryOperationType.Assign,
-			{ Type: TokenType.As } => BinaryOperationType.Cast,
-			_ => null,
-		};
-
-		if (op is not {} operation)
+		
+		if(!TryParseOperand(ref tokens, out var left))
 			return false;
 
-		IAstNode right;
-		switch (operation)
+		if (!TryParseOperator(ref tokens, out var operation))
 		{
-			//TODO fix access after call		func(param).data
-			case BinaryOperationType.Call:
+			if (left is not BinaryExpressionNode binResult) 
+				return false;
+
+			stream = tokens;
+			result = binResult;
+			return true;
+		}
+
+		if(!TryParseOperand(ref tokens, out var right))
+			return false;
+
+		while (true)
+		{
+			if (!TryParseOperator(ref tokens, out var otherOperation))
 			{
-				tokens.Position--;
-				if (!TupleNode.TryParse(ref tokens, out var tuple))
-					return UnexpectedTokenException.Throw<bool>(tokens.Current);
-				
-				right = tuple;
-				break;
+				stream = tokens;
+				result = new BinaryExpressionNode((IExpressionNode) left, right, operation);
+				return true;
 			}
+			
+			if(!TryParseOperand(ref tokens, out var other))
+				return UnexpectedTokenException.Throw<bool>(tokens.Current);
 
-			case BinaryOperationType.Indexing:
+			if (IsArithmeticWithPrecedence(operation))
 			{
-				if (!IExpressionNode.TryParse(ref tokens, false, out var index))
-					return UnexpectedTokenException.Throw<bool>(tokens.Current);
-				
-				tokens.ExpectToken(TokenType.CloseSquare);
-				right = index;
-				break;
+				left = new BinaryExpressionNode((IExpressionNode) left, right, operation);
+				operation = otherOperation;
+				right = other;
 			}
-
-			case BinaryOperationType.Cast:
+			else
 			{
-				if (!TypeNode.TryParse(ref tokens, out var type))
-					return UnexpectedTokenException.Throw<bool>(tokens.Current);
-
-				right = type;
-				break;
+				right = new BinaryExpressionNode((IExpressionNode) right, other, otherOperation);
 			}
+		}
+	}
 
-			default:
+	private static bool TryParseOperand(ref TokenStream stream, out IAstNode result)
+	{
+		if (TryParseAccessChain(ref stream, out var chain))
+		{
+			result = chain;
+			return true;
+		}
+
+		if (IExpressionNode.TryParse(ref stream, true, out var expr))
+		{
+			result = expr;
+			return true;
+		}
+
+		result = default!;
+		return false;
+	}
+
+	public static bool TryParseAccessChain(ref TokenStream stream, out BinaryExpressionNode result)
+	{
+		result = default!;
+		var tokens = stream;
+		
+		if (!IExpressionNode.TryParse(ref tokens, true, out var left))
+			return false;
+
+		if (!TryParseOperator(ref tokens, out var operation))
+			return false;
+
+		if (operation != BinaryOperation.Access)
+			return false;
+		
+		if (!IExpressionNode.TryParse(ref tokens, true, out var right))
+			return UnexpectedTokenException.Throw<bool>(tokens.Current);
+
+		var loop = true;
+		while (loop)
+		{
+			if (!TryParseOperator(ref tokens, out var otherOperation))
+				break;
+
+			switch (otherOperation)
 			{
-				if (!IExpressionNode.TryParse(ref tokens, false, out var parsedRight))
-					return UnexpectedTokenException.Throw<bool>(tokens.Current);
-
-				right = parsedRight;
-				if (right is BinaryOperationNode bin && GetPriority(operation) >= GetPriority(bin.Operation))
+				case BinaryOperation.Access:
 				{
-					right = bin.Right;
-					left = new BinaryOperationNode(left, bin.Left, operation);
-					operation = bin.Operation;
+					if (!IExpressionNode.TryParse(ref tokens, true, out var other))
+						UnexpectedTokenException.Throw<bool>(tokens.Current);
+
+					left = new BinaryExpressionNode(left, right, operation);
+					operation = otherOperation;
+					right = other;
+					break;
+				}
+
+				case BinaryOperation.Call:
+				{
+					if (!RoundBracketedValueList.TryParse(ref tokens, out var other))
+						UnexpectedTokenException.Throw<bool>(tokens.Current);
+
+					left = new BinaryExpressionNode(left, right, operation);
+					operation = otherOperation;
+					right = other;
+					break;
 				}
 				
-				break;
+				case BinaryOperation.Indexing:
+				{
+					if (!SquareBracketedValueList.TryParse(ref tokens, out var other))
+						UnexpectedTokenException.Throw<bool>(tokens.Current);
+
+					left = new BinaryExpressionNode(left, right, operation);
+					operation = otherOperation;
+					right = other;
+					break;
+				}
+
+				default:
+					tokens.Position--;
+					loop = false;
+					break;
 			}
 		}
 
 		stream = tokens;
-		result = new BinaryOperationNode(left, right, operation);
+		result = new BinaryExpressionNode(left, right, operation);
 		return true;
 	}
 
-	private static int GetPriority(BinaryOperationType operation) => operation switch
+	private static bool TryParseOperator(ref TokenStream stream, out BinaryOperation operation)
 	{
-		BinaryOperationType.Access => 3,
-		
-		BinaryOperationType.Modulo => 2,
-		BinaryOperationType.Division => 2,
-		BinaryOperationType.Multiplication => 2,
-		
-		BinaryOperationType.Addition => 1,
-		BinaryOperationType.Subtraction => 1,
-		
-		_ => 0,
+		BinaryOperation? op = stream.Current switch
+		{
+			{ Type: TokenType.Period } => BinaryOperation.Access,
+			{ Type: TokenType.Addition } => BinaryOperation.Addition,
+			{ Type: TokenType.Division } => BinaryOperation.Division,
+			{ Type: TokenType.Exponential } => BinaryOperation.Exponential,
+			{ Type: TokenType.Subtraction } => BinaryOperation.Subtraction,
+			{ Type: TokenType.Multiplication } => BinaryOperation.Multiplication,
+			{ Type: TokenType.Modulo } => BinaryOperation.Modulo,
+			{ Type: TokenType.Range } => BinaryOperation.Range,
+			{ Type: TokenType.Equal } => BinaryOperation.CmpEq,
+			{ Type: TokenType.NotEqual } => BinaryOperation.CmpNe,
+			{ Type: TokenType.LargerThan } => BinaryOperation.CmpGt,
+			{ Type: TokenType.LessThan } => BinaryOperation.CmpLt,
+			{ Type: TokenType.LargerThanOrEqual } => BinaryOperation.CmpGe,
+			{ Type: TokenType.LessThanOrEqual } => BinaryOperation.CmpLe,
+			{ Type: TokenType.OpenRound } => BinaryOperation.Call,
+			{ Type: TokenType.OpenSquare } => BinaryOperation.Indexing,
+			{ Type: TokenType.AssignmentSeparator } => BinaryOperation.Assign,
+			{ Type: TokenType.As } => BinaryOperation.Cast,
+			_ => null,
+		};
+
+		switch (op)
+		{
+			case BinaryOperation.Call or BinaryOperation.Indexing:
+				operation = op.Value;
+				return true;
+			
+			case not null:
+				stream.MoveNext();
+				operation = op.Value;
+				return true;
+			
+			case null:
+				operation = default;
+				return false;
+		}
+	}
+
+	private static bool IsSpecialOperation(BinaryOperation operation) => operation switch
+	{
+		BinaryOperation.Call or
+		BinaryOperation.Access or
+		BinaryOperation.Indexing => true,
+		_ => false,
+	};
+
+	private static bool IsArithmeticWithPrecedence(BinaryOperation operation) => operation switch
+	{
+		BinaryOperation.Modulo or
+		BinaryOperation.Division or
+		BinaryOperation.Multiplication => true,
+		_ => false,
 	};
 }
 
-public enum BinaryOperationType
+public enum BinaryOperation
 {
 	Addition,
 	Subtraction,

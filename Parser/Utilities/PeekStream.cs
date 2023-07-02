@@ -59,7 +59,7 @@ public struct PeekStream
 			return _text.AsMemory(Position, i);
 		}
 
-		return _text.AsMemory();
+		return _text.AsMemory(Position);
 	}
 
 	public delegate bool PeekDelegate<T>(ref T context, char ch);
@@ -73,7 +73,7 @@ public struct PeekStream
 			return _text.AsMemory(Position, i);
 		}
 
-		return _text.AsMemory();
+		return _text.AsMemory(Position);
 	}
 	
 	public ReadOnlyMemory<char> Peek(Func<char, char?, bool> condition)
@@ -87,7 +87,7 @@ public struct PeekStream
 			return _text.AsMemory(Position, i);
 		}
 
-		return _text.AsMemory();
+		return _text.AsMemory(Position);
 	}
 
 	public int CurrentLine

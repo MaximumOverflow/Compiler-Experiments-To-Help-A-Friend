@@ -1,15 +1,15 @@
 ﻿namespace Squyrm.Parser.AST;
 
-public sealed class TupleNode: IExpressionNode, IParseableNode<TupleNode>
+public sealed class RoundBracketedValueList: IExpressionNode, IParseableNode<RoundBracketedValueList>
 {
 	public IReadOnlyList<IExpressionNode> Values { get; }
 
-	internal TupleNode(IReadOnlyList<IExpressionNode> values)
+	internal RoundBracketedValueList(IReadOnlyList<IExpressionNode> values)
 	{
 		Values = values;
 	}
 
-	public static bool TryParse(ref TokenStream stream, out TupleNode result)
+	public static bool TryParse(ref TokenStream stream, out RoundBracketedValueList result)
 	{
 		result = default!;
 		var tokens = stream;
@@ -24,7 +24,7 @@ public sealed class TupleNode: IExpressionNode, IParseableNode<TupleNode>
 			tokens.MoveNext();
 			
 			stream = tokens;
-			result = new TupleNode(values);
+			result = new RoundBracketedValueList(values);
 			return true;
 		}
 
@@ -44,21 +44,21 @@ public sealed class TupleNode: IExpressionNode, IParseableNode<TupleNode>
 		}
 
 		stream = tokens;
-		result = new TupleNode(values);
+		result = new RoundBracketedValueList(values);
 		return true;
 	}
 }
 
-public sealed class ArrayNode: IExpressionNode, IParseableNode<ArrayNode>
+public sealed class SquareBracketedValueList: IExpressionNode, IParseableNode<SquareBracketedValueList>
 {
 	public IReadOnlyList<IExpressionNode> Values { get; }
 
-	internal ArrayNode(IReadOnlyList<IExpressionNode> values)
+	internal SquareBracketedValueList(IReadOnlyList<IExpressionNode> values)
 	{
 		Values = values;
 	}
 
-	public static bool TryParse(ref TokenStream stream, out ArrayNode result)
+	public static bool TryParse(ref TokenStream stream, out SquareBracketedValueList result)
 	{
 		result = default!;
 		var tokens = stream;
@@ -73,7 +73,7 @@ public sealed class ArrayNode: IExpressionNode, IParseableNode<ArrayNode>
 			tokens.MoveNext();
 			
 			stream = tokens;
-			result = new ArrayNode(values);
+			result = new SquareBracketedValueList(values);
 			return true;
 		}
 
@@ -93,7 +93,7 @@ public sealed class ArrayNode: IExpressionNode, IParseableNode<ArrayNode>
 		}
 
 		stream = tokens;
-		result = new ArrayNode(values);
+		result = new SquareBracketedValueList(values);
 		return true;
 	}
 }
